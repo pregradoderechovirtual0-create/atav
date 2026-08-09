@@ -1,0 +1,228 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isRealUser() {
+      return request.auth != null
+        && request.auth.token.firebase.sign_in_provider != 'anonymous';
+    }
+
+    function cedulaAuth() {
+      return request.auth.token.email.split('@')[0];
+    }
+
+    function usuarioAuth() {
+      return exists(/databases/$(database)/documents/usuarios/$(cedulaAuth()))
+        ? get(/databases/$(database)/documents/usuarios/$(cedulaAuth())).data
+        : null;
+    }
+
+    function perfilUsuario() {
+      return isRealUser()
+        ? usuarioAuth()
+        : get(/databases/$(database)/documents/usuarios/$(
+            get(/databases/$(database)/documents/auth_vinculos/$(request.auth.uid)).data.cedula
+          )).data;
+    }
+
+    function esDirector() {
+      let data = perfilUsuario();
+      return isAuthenticated()
+        && data != null
+        && (data.rol == 'Director' || data.rol == 'Jefa Suprema');
+    }
+
+    function esDocente() {
+      let data = perfilUsuario();
+      return isAuthenticated() && data != null && data.rol == 'Docente';
+    }
+
+    function esEstudiante() {
+      let data = perfilUsuario();
+      return isAuthenticated() && data != null && data.rol == 'Estudiante';
+    }
+
+    function esPerfilDirector() {
+      return resource.data.rol == 'Director' || resource.data.rol == 'Jefa Suprema';
+    }
+
+    function camposUsuarioProtegidos() {
+      return ['rol', 'password_hash', 'auth_uid', 'registrado'];
+    }
+
+    match /auth_vinculos/{authUid} {
+      allow read: if isAuthenticated() && request.auth.uid == authUid;
+      allow create: if isAuthenticated()
+        && request.auth.uid == authUid
+        && request.auth.token.firebase.sign_in_provider == 'anonymous'
+        && request.resource.data.keys().hasAll(['cedula', 'rol'])
+        && get(/databases/$(database)/documents/usuarios/$(request.resource.data.cedula)).data.authDesincronizado == true;
+      allow delete: if isAuthenticated() && request.auth.uid == authUid;
+    }
+
+    match /usuarios/{userId} {
+      allow get: if
+        (isRealUser() && cedulaAuth() == userId)
+        || esDirector()
+        || (isRealUser() && esPerfilDirector())
+        || (resource != null && resource.data.registrado == false)
+        || (resource != null && resource.data.authDesincronizado == true);
+
+      allow list: if esDirector();
+
+      allow create: if esDirector()
+        && request.resource.data.rol in ['Docente', 'Estudiante', 'Director', 'Jefa Suprema'];
+
+      allow update: if esDirector()
+        || (
+          isRealUser()
+          && cedulaAuth() == userId
+          && resource.data.registrado == false
+          && request.resource.data.registrado == true
+          && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['rol'])
+        )
+        || (
+          isRealUser()
+          && cedulaAuth() == userId
+          && !request.resource.data.diff(resource.data).affectedKeys().hasAny(camposUsuarioProtegidos())
+        )
+        || (
+          isAuthenticated()
+          && request.auth.token.firebase.sign_in_provider == 'anonymous'
+          && resource.data.authDesincronizado == true
+          && request.resource.data.auth_uid == request.auth.uid
+          && request.resource.data.authDesincronizado == false
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['auth_uid', 'authDesincronizado', 'passwordTemporal', 'claveTemporal'])
+        );
+
+      allow delete: if esDirector();
+    }
+
+    match /solicitudes/{docId} {
+      allow get: if isAuthenticated() && resource.data.usuario_id == request.auth.uid;
+      allow list: if esDirector()
+        || (isAuthenticated() && resource.data.usuario_id == request.auth.uid);
+      allow create: if isAuthenticated()
+        && esDocente()
+        && request.resource.data.usuario_id == request.auth.uid
+        && request.resource.data.descripcion is string
+        && request.resource.data.descripcion.size() > 0
+        && request.resource.data.materia_codigo is string
+        && request.resource.data.materia_codigo.size() > 0
+        && request.resource.data.fecha_inicio is string
+        && request.resource.data.fecha_fin is string
+        && request.resource.data.tipo_reprogramacion is string;
+      allow update, delete: if esDirector();
+    }
+
+    match /flexibilizaciones/{docId} {
+      allow get: if isAuthenticated() && resource.data.estudiante_id == request.auth.uid;
+      allow list: if esDirector()
+        || (isAuthenticated() && resource.data.estudiante_id == request.auth.uid);
+      allow create: if isAuthenticated()
+        && esEstudiante()
+        && request.resource.data.estudiante_id == request.auth.uid
+        && request.resource.data.nombre is string
+        && request.resource.data.nombre.size() > 0;
+      allow update, delete: if esDirector();
+    }
+
+    match /habilitaciones/{docId} {
+      allow get: if isAuthenticated() && resource.data.estudiante_id == request.auth.uid;
+      allow list: if esDirector()
+        || (isAuthenticated() && resource.data.estudiante_id == request.auth.uid);
+      allow create: if isAuthenticated()
+        && esEstudiante()
+        && request.resource.data.estudiante_id == request.auth.uid;
+      allow update, delete: if esDirector();
+    }
+
+    match /supletorios/{docId} {
+      allow get: if isAuthenticated() && resource.data.estudiante_id == request.auth.uid;
+      allow list: if esDirector()
+        || (isAuthenticated() && resource.data.estudiante_id == request.auth.uid);
+      allow create: if isAuthenticated()
+        && esEstudiante()
+        && request.resource.data.estudiante_id == request.auth.uid;
+      allow update, delete: if esDirector();
+    }
+
+    match /notificaciones/{docId} {
+      allow read, update: if isAuthenticated()
+        && resource.data.usuario_id == request.auth.uid;
+      allow create: if isAuthenticated()
+        && request.resource.data.usuario_id is string
+        && request.resource.data.titulo is string
+        && request.resource.data.titulo.size() > 0
+        && request.resource.data.titulo.size() <= 120
+        && request.resource.data.mensaje is string
+        && request.resource.data.mensaje.size() <= 500
+        && request.resource.data.leida == false
+        && (esDirector() || esDocente() || esEstudiante());
+      allow delete: if esDirector();
+    }
+
+    match /materias/{docId} {
+      allow read: if isAuthenticated();
+      allow write: if esDirector();
+    }
+
+    match /parciales/{docId} {
+      allow read: if isAuthenticated();
+      allow write: if esDirector();
+    }
+
+    match /llamadas/{docId} {
+      allow read, write: if esDirector();
+    }
+
+    match /aspirantes/{docId} {
+      allow read, write: if esDirector();
+    }
+
+    match /reprogramaciones/{docId} {
+      allow read, write: if esDirector();
+    }
+
+    match /eventos/{docId} {
+      allow read: if isAuthenticated();
+      allow write: if esDirector();
+    }
+
+    match /periodosNoLectivos/{docId} {
+      allow read: if isAuthenticated();
+      allow write: if esDirector();
+    }
+
+    match /documentos/{docId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if esDirector();
+    }
+
+    function claveJefaYaConfigurada() {
+      return exists(/databases/$(database)/documents/config/seguridad)
+        && get(/databases/$(database)/documents/config/seguridad).data.keys().hasAny(['clave_jefa_hash'])
+        && get(/databases/$(database)/documents/config/seguridad).data.clave_jefa_hash is string
+        && get(/databases/$(database)/documents/config/seguridad).data.clave_jefa_hash.size() > 0;
+    }
+
+    match /config/seguridad {
+      allow read: if esDirector();
+      allow create: if esDirector()
+        && request.resource.data.keys().hasOnly(['clave_jefa_hash'])
+        && request.resource.data.clave_jefa_hash is string
+        && request.resource.data.clave_jefa_hash.size() > 0;
+      allow update: if esDirector()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['clave_jefa_hash'])
+        && request.resource.data.clave_jefa_hash is string
+        && request.resource.data.clave_jefa_hash.size() > 0
+        && (perfilUsuario().rol == 'Jefa Suprema' || !claveJefaYaConfigurada());
+    }
+  }
+}
