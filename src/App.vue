@@ -1,114 +1,45 @@
 <script setup lang="ts">
 import { computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import Sidebar from './components/Sidebar.vue'
-import Header from './components/Header.vue'
-import AppDialog from './components/AppDialog.vue'
-import { applyThemeForRole } from '@/lib/theme'
-import { obtenerSesion } from '@/lib/session'
+import Sidebar from '@/componentes/estructura/Sidebar.vue'
+import Header from '@/componentes/estructura/Header.vue'
+import AppDialog from '@/componentes/estructura/AppDialog.vue'
+import { applyThemeForRole } from '@/lib/nucleo/theme'
+import { validarSesionConServidor, sincronizarSesionLocal } from '@/lib/autenticacion/session'
+import { headerInfoForPath, mobileBarTitleForPath } from '@/configuracion/titulosPagina'
 import { useSidebar } from '@/composables/useSidebar'
 import { useNetworkStatus } from '@/composables/useNetworkStatus'
 import { useRouteStyles } from '@/composables/useRouteStyles'
+import { useValidarSesionAlVolver } from '@/composables/useValidarSesionAlVolver'
 
 const route = useRoute()
 const { isMobile, openMobileMenu } = useSidebar()
 useNetworkStatus()
 useRouteStyles(route)
+useValidarSesionAlVolver()
 
 onMounted(async () => {
   try {
-    const sesion = await obtenerSesion()
-    applyThemeForRole(sesion?.rol ?? null)
+    const validacion = await validarSesionConServidor()
+    if (validacion.valida) {
+      sincronizarSesionLocal(validacion.sesion)
+      applyThemeForRole(validacion.sesion.rol)
+      return
+    }
+    applyThemeForRole(localStorage.getItem('rol'))
   } catch {
     applyThemeForRole(localStorage.getItem('rol'))
   }
 })
 
-const isLoginPage = computed(() => {
-  return route.path === '/' || route.path === '/registro'
-})
-
+const isLoginPage = computed(() => route.path === '/' || route.path === '/registro')
 const isErrorPage = computed(() => route.name === 'error' || route.path.startsWith('/error/'))
 
-const headerInfo = computed(() => {
-  const path = route.path.replace(/\/$/, '') || route.path
+const headerInfo = computed(() => headerInfoForPath(route.path))
 
-  if (path.startsWith('/docente/solicitud/')) {
-    return { title: 'Detalle de solicitud', subtitle: 'Información de tu solicitud' }
-  }
-  if (path.startsWith('/director/restablecer-password/')) {
-    return { title: 'Restablecer contraseña', subtitle: 'Asignar nueva contraseña al usuario' }
-  }
-  if (path.startsWith('/director/aspirantes/editar/')) {
-    return { title: 'Editar aspirante', subtitle: 'Actualizar datos del aspirante' }
-  }
-
-  const titles: Record<string, { title: string; subtitle?: string }> = {
-    // Perfil
-    '/perfil': { title: 'Mi Perfil', subtitle: 'Información de tu cuenta' },
-    '/perfil/editar': { title: 'Editar perfil', subtitle: 'Actualiza tus datos' },
-
-    // DOCENTE
-    '/docente/dashboard': { title: 'Dashboard', subtitle: 'Resumen de actividad' },
-    '/docente/crear-solicitud': { title: 'Nueva Solicitud', subtitle: 'Crear solicitud de ausentismo' },
-    '/docente/mis-solicitudes': { title: 'Mis Solicitudes', subtitle: 'Historial de solicitudes' },
-    '/docente/materias-asignadas': { title: 'Materias asignadas', subtitle: 'Asignaturas a tu cargo' },
-    '/docente/notificaciones': { title: 'Notificaciones', subtitle: 'Notificaciones actualizadas' },
-    '/docente/recursos': { title: 'Recursos', subtitle: 'Formatos y documentos oficiales' },
-
-    // DIRECTOR
-    '/director': { title: '', subtitle: '' },
-    '/director/solicitudes': { title: 'Solicitudes', subtitle: 'Gestionar solicitudes del programa' },
-    '/director/reportes': { title: 'Reportes', subtitle: 'Estadisticas y reportes' },
-    '/director/notificaciones': {title: 'Notificaciones', subtitle: 'Notificaciones actualizadas'},
-    '/director/usuarios': { title: 'Usuarios', subtitle: 'Usuarios registrados' },
-    '/director/usuarios/crear': { title: 'Crear usuario', subtitle: 'Registrar nuevo usuario' },
-    '/director/materias': {title: 'Materias', subtitle: 'Asignaturas registradas'},
-    '/director/parciales': { title: 'Fechas de parciales', subtitle: 'Rangos de fechas por parcial' },
-    '/director/llamadas': {title: 'Llamadas', subtitle: 'Llamadas registradas'},
-    '/director/aspirantes': {title: 'Aspirantes', subtitle: 'Estudiantes interesados'},
-    '/director/recursos': { title: 'Recursos', subtitle: 'Formatos y documentos oficiales' },
-
-    // Calendario
-    '/director/calendario': { title: 'Calendario', subtitle: 'Eventos y fechas importantes' },
-    '/docente/calendario': { title: 'Calendario', subtitle: 'Eventos y fechas importantes' },
-    '/estudiante/calendario': { title: 'Calendario', subtitle: 'Eventos y fechas importantes' },
-
-    // ESTUDIANTE
-    '/estudiante': { title: '', subtitle: '' },
-    '/estudiante/crear-solicitud': { title: 'Nueva Solicitud', subtitle: 'Solicitar excusa academica' },
-    '/estudiante/mis-solicitudes': { title: 'Mis Solicitudes', subtitle: 'Estado de tus solicitudes' },
-    '/estudiante/notificaciones': { title: 'Notificaciones', subtitle: 'Notificaciones actualizadas' },
-    '/estudiante/flexibilidad': { title: 'Flexibilización', subtitle: 'Solicitar flexibilización de parcial' },
-    '/estudiante/supletorios': { title: 'Supletorios', subtitle: 'Solicitar examen supletorio' },
-    '/estudiante/habilitaciones': { title: 'Habilitaciones', subtitle: 'Solicitar habilitación de materia' },
-    '/estudiante/recursos': { title: 'Recursos', subtitle: 'Formatos y documentos oficiales' },
-
-  }
-
-  if (titles[path]) return titles[path]
-
-  const prefixKeys = Object.keys(titles)
-    .filter(k => k !== '/director' && k !== '/estudiante')
-    .sort((a, b) => b.length - a.length)
-
-  for (const key of prefixKeys) {
-    if (path === key || path.startsWith(`${key}/`)) {
-      return titles[key]
-    }
-  }
-
-  return { title: '', subtitle: '' }
-})
-
-const mobileBarTitle = computed(() => {
-  if (headerInfo.value.title) return headerInfo.value.title
-  const path = route.path.replace(/\/$/, '') || route.path
-  if (path === '/estudiante' || path === '/director' || path.startsWith('/docente/dashboard')) {
-    return 'Inicio'
-  }
-  return 'ATAV'
-})
+const mobileBarTitle = computed(() =>
+  mobileBarTitleForPath(route.path, headerInfo.value.title),
+)
 </script>
 
 <template>

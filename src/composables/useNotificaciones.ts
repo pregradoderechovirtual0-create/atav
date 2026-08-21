@@ -2,7 +2,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { collection, query, where, onSnapshot, updateDoc, doc, type Unsubscribe } from 'firebase/firestore'
 import { auth, db } from '@/lib/firebase'
 import { onAuthStateChanged, type User } from 'firebase/auth'
-import { mapNotificacionDoc, type NotificacionData } from '@/lib/notificaciones'
+import { mapNotificacionDoc, type NotificacionData } from '@/lib/dominio/notificaciones'
 
 const notificaciones = ref<NotificacionData[]>([])
 const loading = ref(true)

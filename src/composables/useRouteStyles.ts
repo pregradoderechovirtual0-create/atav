@@ -6,8 +6,8 @@ const loaded = new Set<string>()
 function loadRouteStyles(path: string) {
   if (path.startsWith('/director') && !loaded.has('director')) {
     loaded.add('director')
-    void import('../styles/director-list-page.css')
-    void import('../styles/director-modal.css')
+    void import('../estilos/director-list-page.css')
+    void import('../estilos/director-modal.css')
   }
 }
 

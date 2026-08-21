@@ -61,7 +61,10 @@ service cloud.firestore {
         && request.auth.uid == authUid
         && request.auth.token.firebase.sign_in_provider == 'anonymous'
         && request.resource.data.keys().hasAll(['cedula', 'rol'])
-        && get(/databases/$(database)/documents/usuarios/$(request.resource.data.cedula)).data.authDesincronizado == true;
+        && (
+          get(/databases/$(database)/documents/usuarios/$(request.resource.data.cedula)).data.authDesincronizado == true
+          || get(/databases/$(database)/documents/usuarios/$(request.resource.data.cedula)).data.passwordTemporal == true
+        );
       allow delete: if isAuthenticated() && request.auth.uid == authUid;
     }
 
@@ -71,7 +74,8 @@ service cloud.firestore {
         || esDirector()
         || (isRealUser() && esPerfilDirector())
         || (resource != null && resource.data.registrado == false)
-        || (resource != null && resource.data.authDesincronizado == true);
+        || (resource != null && resource.data.authDesincronizado == true)
+        || (resource != null && resource.data.passwordTemporal == true);
 
       allow list: if esDirector();
 
@@ -89,14 +93,21 @@ service cloud.firestore {
         || (
           isRealUser()
           && cedulaAuth() == userId
+          && request.resource.data.auth_uid == request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['auth_uid'])
+        )
+        || (
+          isRealUser()
+          && cedulaAuth() == userId
           && !request.resource.data.diff(resource.data).affectedKeys().hasAny(camposUsuarioProtegidos())
         )
         || (
           isAuthenticated()
           && request.auth.token.firebase.sign_in_provider == 'anonymous'
-          && resource.data.authDesincronizado == true
+          && (resource.data.authDesincronizado == true || resource.data.passwordTemporal == true)
           && request.resource.data.auth_uid == request.auth.uid
           && request.resource.data.authDesincronizado == false
+          && request.resource.data.passwordTemporal == false
           && request.resource.data.diff(resource.data).affectedKeys()
             .hasOnly(['auth_uid', 'authDesincronizado', 'passwordTemporal', 'claveTemporal'])
         );
