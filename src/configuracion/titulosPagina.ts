@@ -45,8 +45,11 @@ export function headerInfoForPath(path: string): PageHeaderInfo {
   if (normalized.startsWith('/docente/solicitud/')) {
     return { title: 'Detalle de solicitud', subtitle: 'Información de tu solicitud' }
   }
+  if (normalized.startsWith('/director/reactivar-cuenta/')) {
+    return { title: 'Reactivar cuenta', subtitle: 'Restablecer acceso sin borrar datos del usuario' }
+  }
   if (normalized.startsWith('/director/restablecer-password/')) {
-    return { title: 'Restablecer contraseña', subtitle: 'Asignar nueva contraseña al usuario' }
+    return { title: 'Reactivar cuenta', subtitle: 'Restablecer acceso sin borrar datos del usuario' }
   }
   if (normalized.startsWith('/director/aspirantes/editar/')) {
     return { title: 'Editar aspirante', subtitle: 'Actualizar datos del aspirante' }

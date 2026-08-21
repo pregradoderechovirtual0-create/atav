@@ -1,13 +1,15 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { collection, getDocs } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { obtenerSesion } from '@/lib/autenticacion/session'
 import { fetchMaterias } from '@/lib/dominio/materias'
-import { fetchSolicitudesDirector, type SolicitudDirector } from '@/lib/director/directorSolicitudesAggregate'
+import {
+  subscribeSolicitudesDirector,
+  type SolicitudDirector,
+} from '@/lib/director/directorSolicitudesAggregate'
 import { computarStatsDirector, TIPOS_TRAZABILIDAD } from '@/lib/director/directorStats'
 import { primerosDosNombres } from '@/lib/nucleo/nombreCorto'
-import { useRefreshOnVisible } from '@/composables/useRefreshOnVisible'
 
 const nombreDirectora = ref('Directora')
 
@@ -55,56 +57,46 @@ const formatFecha = (ts: unknown) => {
   return d.toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
-const cargarDatos = async () => {
-  loading.value = true
-  try {
-    let materias: Awaited<ReturnType<typeof fetchMaterias>> = []
-    try {
-      materias = await fetchMaterias()
-    } catch (e) {
-      console.error('Error cargando materias:', e)
+const aplicarSolicitudes = (todas: SolicitudDirector[]) => {
+  const resumen = computarStatsDirector(todas)
+
+  stats.value.total = resumen.total
+  stats.value.pendientes = resumen.pendientes
+  stats.value.aprobadas = resumen.aprobadas
+  stats.value.rechazadas = resumen.rechazadas
+  trazabilidad.value = resumen.trazabilidad
+
+  solicitudesRecientes.value = todas.slice(0, 5).map((s: SolicitudDirector) => {
+    const esTrazabilidad = TIPOS_TRAZABILIDAD.includes(s.tipo as typeof TIPOS_TRAZABILIDAD[number])
+    const nombre = s.nombre || 'Usuario'
+    return {
+      id: s.id,
+      nombre,
+      tipo: tipoLabel[s.tipo] || s.tipo || '—',
+      fecha: formatFecha(s.creadoEn),
+      estado: esTrazabilidad ? 'Registrado' : mapEstadoLista(s.estado),
+      estadoClass: esTrazabilidad
+        ? 'muted'
+        : (estadoClassFromLabel[s.estado] || 'pending'),
+      esTrazabilidad,
+      iniciales: nombre.charAt(0).toUpperCase(),
     }
-
-    const todas = await fetchSolicitudesDirector(materias)
-    const resumen = computarStatsDirector(todas)
-
-    stats.value.total = resumen.total
-    stats.value.pendientes = resumen.pendientes
-    stats.value.aprobadas = resumen.aprobadas
-    stats.value.rechazadas = resumen.rechazadas
-    trazabilidad.value = resumen.trazabilidad
-
-    solicitudesRecientes.value = todas.slice(0, 5).map((s: SolicitudDirector) => {
-      const esTrazabilidad = TIPOS_TRAZABILIDAD.includes(s.tipo as typeof TIPOS_TRAZABILIDAD[number])
-      const nombre = s.nombre || 'Usuario'
-      return {
-        id: s.id,
-        nombre,
-        tipo: tipoLabel[s.tipo] || s.tipo || '—',
-        fecha: formatFecha(s.creadoEn),
-        estado: esTrazabilidad ? 'Registrado' : mapEstadoLista(s.estado),
-        estadoClass: esTrazabilidad
-          ? 'muted'
-          : (estadoClassFromLabel[s.estado] || 'pending'),
-        esTrazabilidad,
-        iniciales: nombre.charAt(0).toUpperCase(),
-      }
-    })
-
-    try {
-      const parSnap = await getDocs(collection(db, 'parciales'))
-      const hoy = new Date()
-      proximosParciales.value = parSnap.docs
-        .map(d => ({ id: d.id, ...d.data() }))
-        .filter((p: any) => new Date(p.fecha + 'T00:00:00') >= hoy)
-        .sort((a: any, b: any) => a.fecha.localeCompare(b.fecha))
-        .slice(0, 3) as any[]
-    } catch (_) {}
-  } catch (e) {
-    console.error(e)
-  }
-  loading.value = false
+  })
 }
+
+const cargarParciales = async () => {
+  try {
+    const parSnap = await getDocs(collection(db, 'parciales'))
+    const hoy = new Date()
+    proximosParciales.value = parSnap.docs
+      .map(d => ({ id: d.id, ...d.data() }))
+      .filter((p: any) => new Date(p.fecha + 'T00:00:00') >= hoy)
+      .sort((a: any, b: any) => a.fecha.localeCompare(b.fecha))
+      .slice(0, 3) as any[]
+  } catch (_) {}
+}
+
+let unsubSolicitudes: (() => void) | null = null
 
 const tipoColorParcial: Record<string, string> = {
   habilitacion: '#3b82f6',
@@ -115,10 +107,28 @@ const tipoColorParcial: Record<string, string> = {
 onMounted(async () => {
   const sesion = await obtenerSesion()
   if (sesion?.nombre) nombreDirectora.value = sesion.nombre
-  cargarDatos()
+
+  loading.value = true
+  await cargarParciales()
+
+  const materias = await fetchMaterias().catch(() => [])
+  unsubSolicitudes = subscribeSolicitudesDirector(
+    materias,
+    (lista) => {
+      aplicarSolicitudes(lista)
+      loading.value = false
+    },
+    (err) => {
+      console.error(err)
+      loading.value = false
+    },
+  )
 })
 
-useRefreshOnVisible(cargarDatos)
+onUnmounted(() => {
+  unsubSolicitudes?.()
+  unsubSolicitudes = null
+})
 </script>
 
 <template>

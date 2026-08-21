@@ -32,7 +32,7 @@ export function consumirMotivoCierreSesion(): MotivoSesionInvalida | null {
 
 export function mensajeMotivoCierreSesion(motivo: MotivoSesionInvalida): string {
   if (motivo === 'password_restablecida') {
-    return 'Tu contraseña fue restablecida. Inicia sesión con la nueva clave asignada.'
+    return 'Tu acceso fue restablecido. Usa «Activa tu cuenta» en el login para crear una contraseña nueva, o inicia sesión si ya la creaste.'
   }
   if (motivo === 'usuario_inactivo') {
     return 'Tu cuenta ya no está activa. Contacta a administración.'
@@ -78,8 +78,6 @@ async function sesionDesdeVinculo(uid: string): Promise<SesionUsuario | null> {
     if (!snap.exists()) return sesionDesdeLocal(uid)
 
     const data = snap.data()
-    if (data.auth_uid && data.auth_uid !== uid) return null
-
     const rol = (data.rol || vinculoSnap.data().rol || '').toString()
     if (!rol) return null
 

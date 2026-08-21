@@ -146,30 +146,61 @@ const registrar = async () => {
 
     const userData = userSnap.data()
 
-    if (userData.passwordTemporal === true || userData.authDesincronizado === true) {
-      errorMessage.value =
-        'Administración ya te asignó una contraseña. Ve a "Iniciar sesión" e ingrésala allí (no uses Activar cuenta).'
-      modo.value = 'login'
-      cedula.value = cedulaLimpia
-      return
-    }
-
     if (userData.registrado === true) {
       errorMessage.value = 'Ya tienes contraseña. Inicia sesión.'
       return
     }
 
-    await createUserWithEmailAndPassword(auth, `${cedulaLimpia}@atav.com`, regPassword.value)
+    if (userData.passwordTemporal === true) {
+      errorMessage.value =
+        'Administración te asignó una contraseña temporal. Ve a "Iniciar sesión" e ingrésala allí (no uses Activar cuenta).'
+      modo.value = 'login'
+      cedula.value = cedulaLimpia
+      return
+    }
 
-    await updateDoc(userRef, {
-      registrado: true,
-      requiereCambioPassword: false,
-      passwordTemporal: false,
-      password_hash: await hashPassword(regPassword.value),
-      auth_uid: auth.currentUser?.uid || null,
-    })
+    const passwordHash = await hashPassword(regPassword.value)
+    const email = `${cedulaLimpia}@atav.com`
 
-    successMessage.value = 'Registro exitoso. Redirigiendo...'
+    try {
+      await createUserWithEmailAndPassword(auth, email, regPassword.value)
+
+      await updateDoc(userRef, {
+        registrado: true,
+        requiereCambioPassword: false,
+        passwordTemporal: false,
+        reactivacionPendiente: false,
+        password_hash: passwordHash,
+        auth_uid: auth.currentUser?.uid || null,
+        authDesincronizado: false,
+      })
+
+      await auth.signOut().catch(() => {})
+
+      successMessage.value = 'Cuenta activada. Inicia sesión con tu cédula y la contraseña que creaste.'
+    } catch (error: unknown) {
+      const err = error as { code?: string; message?: string }
+
+      if (err.code === 'auth/email-already-in-use') {
+        await updateDoc(userRef, {
+          registrado: true,
+          requiereCambioPassword: false,
+          passwordTemporal: false,
+          reactivacionPendiente: false,
+          password_hash: passwordHash,
+          authDesincronizado: true,
+        })
+
+        successMessage.value =
+          'Contraseña actualizada. Inicia sesión con tu cédula y la contraseña que acabas de crear.'
+      } else if (err.code === 'auth/weak-password') {
+        errorMessage.value = 'Contraseña muy débil'
+        return
+      } else {
+        errorMessage.value = err.message || 'No se pudo completar la activación'
+        return
+      }
+    }
 
     setTimeout(() => {
       modo.value = 'login'

@@ -9,6 +9,8 @@ import {
 } from 'firebase/auth'
 import { auth, db } from '@/lib/firebase'
 import { hashPassword, verifyPassword } from '@/lib/autenticacion/passwordUtils'
+import { sincronizarIndiceDirectorUid } from '@/lib/autenticacion/directorUidIndex'
+import { esRolDirector } from '@/lib/nucleo/roles'
 
 export class LoginError extends Error {
   constructor(
@@ -39,6 +41,15 @@ async function signInConReintentos(email: string, password: string, intentos = 3
   return false
 }
 
+async function signInConUnIntento(email: string, password: string): Promise<boolean> {
+  try {
+    await signInWithEmailAndPassword(auth, email, password)
+    return true
+  } catch {
+    return false
+  }
+}
+
 async function leerPerfilUsuario(cedula: string) {
   const userRef = doc(db, 'usuarios', cedula)
   const snap = await getDoc(userRef)
@@ -48,9 +59,31 @@ async function leerPerfilUsuario(cedula: string) {
   return { userRef, data: snap.data() }
 }
 
+async function intentarLeerPerfil(cedula: string) {
+  try {
+    return await leerPerfilUsuario(cedula)
+  } catch (error) {
+    if (error instanceof LoginError && error.code === 'NOT_FOUND') throw error
+    return null
+  }
+}
+
 async function verificarPasswordFirestore(data: Record<string, unknown>, password: string) {
   if (!data.password_hash) return false
   return verifyPassword(password, data.password_hash as string)
+}
+
+function requiereLoginPorHash(data: Record<string, unknown>) {
+  return data.authDesincronizado === true || data.passwordTemporal === true
+}
+
+function validarCuentaActivada(data: Record<string, unknown>) {
+  if (data.registrado === false) {
+    throw new LoginError(
+      'Tu cuenta aún no está activada. Usa "Activa tu cuenta" para crear tu contraseña.',
+      'INVALID_CREDENTIALS',
+    )
+  }
 }
 
 async function entrarConSesionAnonima(cedula: string, data: Record<string, unknown>) {
@@ -74,8 +107,6 @@ async function entrarConSesionAnonima(cedula: string, data: Record<string, unkno
     rol: data.rol,
   })
   await updateDoc(userRef, {
-    auth_uid: user.uid,
-    authDesincronizado: false,
     passwordTemporal: false,
     claveTemporal: deleteField(),
   })
@@ -122,7 +153,32 @@ async function sincronizarTrasLogin(
     )
   }
 
+  const rol = (data.rol || '').toString()
+  const cedulaPerfil = userRef.id
+  if (esRolDirector(rol) && user.uid) {
+    syncTasks.push(
+      sincronizarIndiceDirectorUid(user.uid, rol, cedulaPerfil).catch(() => {}),
+    )
+  }
+
   await Promise.all(syncTasks)
+}
+
+async function entrarConFirebaseEmail(
+  email: string,
+  password: string,
+  userRef: ReturnType<typeof doc>,
+  data: Record<string, unknown>,
+  reintentos = 3,
+) {
+  const signInOk = await signInConReintentos(email, password, reintentos)
+  if (!signInOk) {
+    throw new LoginError('Cédula o contraseña incorrecta', 'INVALID_CREDENTIALS')
+  }
+
+  validarCuentaActivada(data)
+  await sincronizarTrasLogin(userRef, data, password)
+  return data
 }
 
 export async function iniciarSesionConCedula(cedula: string, password: string, recordar = true) {
@@ -135,44 +191,39 @@ export async function iniciarSesionConCedula(cedula: string, password: string, r
   await configurarPersistenciaSesion(recordar)
 
   const email = emailDeCedula(cedula)
-  const userRef = doc(db, 'usuarios', cedula)
+  const perfil = await intentarLeerPerfil(cedula)
 
-  const signInOk = await signInConReintentos(email, password)
+  if (perfil) {
+    const { userRef, data } = perfil
+    validarCuentaActivada(data)
 
-  if (signInOk) {
-    const { data } = await leerPerfilUsuario(cedula)
-    await sincronizarTrasLogin(userRef, data, password)
-    return data
+    if (data.password_hash) {
+      const hashOk = await verificarPasswordFirestore(data, password)
+      if (!hashOk) {
+        throw new LoginError('Cédula o contraseña incorrecta', 'INVALID_CREDENTIALS')
+      }
+
+      if (requiereLoginPorHash(data)) {
+        return entrarConSesionAnonima(cedula, data)
+      }
+
+      if (await signInConUnIntento(email, password)) {
+        await sincronizarTrasLogin(userRef, data, password)
+        return data
+      }
+
+      return entrarConSesionAnonima(cedula, data)
+    }
+
+    return entrarConFirebaseEmail(email, password, userRef, data)
   }
 
-  let snap
-  try {
-    snap = await getDoc(userRef)
-  } catch {
-    await signOut(auth).catch(() => {})
-    throw new LoginError('Cédula o contraseña incorrecta', 'INVALID_CREDENTIALS')
+  if (await signInConReintentos(email, password)) {
+    const perfilAutenticado = await leerPerfilUsuario(cedula)
+    validarCuentaActivada(perfilAutenticado.data)
+    await sincronizarTrasLogin(perfilAutenticado.userRef, perfilAutenticado.data, password)
+    return perfilAutenticado.data
   }
 
-  if (!snap.exists()) {
-    throw new LoginError('Usuario no encontrado', 'NOT_FOUND')
-  }
-
-  const data = snap.data()
-
-  if (data.registrado === false) {
-    await signOut(auth).catch(() => {})
-    throw new LoginError(
-      'Tu cuenta aún no está activada. Usa "Activa tu cuenta" para crear tu contraseña.',
-      'INVALID_CREDENTIALS',
-    )
-  }
-
-  const hashOk = await verificarPasswordFirestore(data, password)
-
-  if (!hashOk) {
-    await signOut(auth).catch(() => {})
-    throw new LoginError('Cédula o contraseña incorrecta', 'INVALID_CREDENTIALS')
-  }
-
-  return entrarConSesionAnonima(cedula, data)
+  throw new LoginError('Cédula o contraseña incorrecta', 'INVALID_CREDENTIALS')
 }

@@ -42,24 +42,16 @@ const startFirestoreListener = (uid: string) => {
 
 const startAuthListener = () => {
   if (authUnsub) return
-  const run = () => {
-    authUnsub = onAuthStateChanged(auth, (user: User | null) => {
-      if (user) {
-        startFirestoreListener(user.uid)
-      } else {
-        stopFirestoreListener()
-        currentUid.value = null
-        notificaciones.value = []
-        loading.value = false
-      }
-    })
-  }
-
-  if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
-    window.requestIdleCallback(run, { timeout: 2500 })
-  } else {
-    setTimeout(run, 150)
-  }
+  authUnsub = onAuthStateChanged(auth, (user: User | null) => {
+    if (user) {
+      startFirestoreListener(user.uid)
+    } else {
+      stopFirestoreListener()
+      currentUid.value = null
+      notificaciones.value = []
+      loading.value = false
+    }
+  })
 }
 
 const stopAuthListener = () => {

@@ -125,6 +125,24 @@ onMounted(() => {
         <h2 class="section-title">Motivo de rechazo</h2>
         <p class="rechazo-text">{{ solicitud.motivo_rechazo }}</p>
       </section>
+
+      <section class="detalle-card">
+        <h2 class="section-title">Documentación de soporte</h2>
+        <a
+          v-if="solicitud.pdf_url"
+          :href="solicitud.pdf_url"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="pdf-link"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+          </svg>
+          Ver documento PDF adjunto
+        </a>
+        <p v-else class="empty-inline">No se adjuntó documento en esta solicitud.</p>
+      </section>
     </template>
   </div>
 </template>
@@ -184,6 +202,40 @@ onMounted(() => {
 
 .empty-state, .empty-inline { font-size: 13px; color: var(--color-text-muted); }
 .empty-inline { margin: 0; }
+
+.pdf-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-accent);
+  background: var(--color-info-bg);
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  text-decoration: none;
+  transition: opacity var(--transition);
+}
+.pdf-link:hover { opacity: 0.75; }
+
+@media (max-width: 768px) {
+  .detalle-header {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .opcion-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+
+  .pdf-link {
+    width: 100%;
+    justify-content: center;
+    box-sizing: border-box;
+  }
+}
 
 @media (max-width: 640px) {
   .info-grid { grid-template-columns: 1fr; }

@@ -14,9 +14,33 @@ function hashPassword(password) {
   return `${salt.toString("hex")}:${hash.toString("hex")}`;
 }
 
+async function obtenerOActualizarUidEmail(cedula, nuevaPassword) {
+  const email = `${cedula}@atav.com`;
+
+  try {
+    const existing = await getAuth().getUserByEmail(email);
+    await getAuth().updateUser(existing.uid, { password: nuevaPassword });
+    return existing.uid;
+  } catch (err) {
+    if (err.code !== "auth/user-not-found") {
+      throw err;
+    }
+  }
+
+  const created = await getAuth().createUser({
+    email,
+    password: nuevaPassword,
+    emailVerified: true,
+  });
+  return created.uid;
+}
+
 exports.cambiarPasswordUsuario = onCall(async (request) => {
   if (!request.auth) {
-    throw new HttpsError("unauthenticated", "Debes iniciar sesión.");
+    throw new HttpsError(
+      "unauthenticated",
+      "Debes iniciar sesión como Director para restablecer contraseñas.",
+    );
   }
 
   const cedula = String(request.data?.cedula || "").trim();
@@ -35,6 +59,14 @@ exports.cambiarPasswordUsuario = onCall(async (request) => {
 
   const callerEmail = request.auth.token.email || "";
   const callerCedula = callerEmail.split("@")[0];
+
+  if (!/^\d+$/.test(callerCedula)) {
+    throw new HttpsError(
+      "permission-denied",
+      "Sesión inválida. Cierra sesión e ingresa de nuevo como Director.",
+    );
+  }
+
   const callerSnap = await getFirestore()
     .collection("usuarios")
     .doc(callerCedula)
@@ -52,36 +84,32 @@ exports.cambiarPasswordUsuario = onCall(async (request) => {
     throw new HttpsError("not-found", "Usuario no encontrado.");
   }
 
-  const userData = userSnap.data();
-  let uid = userData.auth_uid;
-  const email = `${cedula}@atav.com`;
-
-  if (!uid) {
-    try {
-      const authUser = await getAuth().getUserByEmail(email);
-      uid = authUser.uid;
-      await getFirestore().collection("usuarios").doc(cedula).update({ auth_uid: uid });
-    } catch {
-      throw new HttpsError(
-        "not-found",
-        "El usuario no tiene cuenta de acceso activa.",
-      );
-    }
+  let uid;
+  try {
+    uid = await obtenerOActualizarUidEmail(cedula, nuevaPassword);
+  } catch (err) {
+    console.error("cambiarPasswordUsuario auth error:", err);
+    throw new HttpsError(
+      "internal",
+      "No se pudo actualizar la cuenta de acceso en Firebase Authentication.",
+    );
   }
 
-  await getAuth().updateUser(uid, { password: nuevaPassword });
-  await getFirestore().collection("usuarios").doc(cedula).set(
-    {
-      registrado: true,
-      auth_uid: uid,
-      password_hash: hashPassword(nuevaPassword),
-      passwordTemporal: false,
-      authDesincronizado: false,
-      claveTemporal: FieldValue.delete(),
-      requiereCambioPassword: false,
-    },
-    { merge: true },
-  );
+  await getFirestore()
+    .collection("usuarios")
+    .doc(cedula)
+    .set(
+      {
+        registrado: true,
+        auth_uid: uid,
+        password_hash: hashPassword(nuevaPassword),
+        passwordTemporal: true,
+        authDesincronizado: false,
+        claveTemporal: FieldValue.delete(),
+        requiereCambioPassword: false,
+      },
+      { merge: true },
+    );
 
-  return { ok: true };
+  return { ok: true, uid };
 });

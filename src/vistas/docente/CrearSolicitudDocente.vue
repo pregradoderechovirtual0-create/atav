@@ -11,7 +11,17 @@ import {
   TIPOS_REPROGRAMACION,
   crearSolicitudDocente,
 } from '@/lib/solicitudes/docenteSolicitudes'
+import { sumarDiasIso } from '@/lib/ui/calendarioFormulario'
+import SelectorFechaApp from '@/componentes/formularios/SelectorFechaApp.vue'
+import SelectorFechaHoraApp from '@/componentes/formularios/SelectorFechaHoraApp.vue'
 import { dialog } from '@/lib/nucleo/dialog'
+import {
+  alertaSinConexion,
+  confirmarReintento,
+  hayConexion,
+  mensajeErrorEnvio,
+  subirPdfCloudinary,
+} from '@/lib/nucleo/erroresOperacion'
 
 const router = useRouter()
 const currentStep = ref(1)
@@ -35,6 +45,14 @@ const tiposReprogramacion = TIPOS_REPROGRAMACION
 
 const materiaSeleccionada = computed(() =>
   materiasDocente.value.find(m => m.codigo === formData.value.materiaCodigo)
+)
+
+const minReprogramacion = computed(() =>
+  formData.value.fechaFin ? sumarDiasIso(formData.value.fechaFin, 1) : undefined,
+)
+
+const maxReprogramacion = computed(() =>
+  formData.value.fechaFin ? sumarDiasIso(formData.value.fechaFin, 8) : undefined,
 )
 
 const canGoNext = computed(() => {
@@ -106,25 +124,16 @@ const prevStep = () => {
   if (currentStep.value > 1) currentStep.value--
 }
 
-const mensajeErrorFirebase = (error: unknown) => {
-  if (error instanceof Error && error.message && !error.message.includes('Firebase')) {
-    return error.message
-  }
-  const code =
-    error && typeof error === 'object' && 'code' in error
-      ? String((error as { code: string }).code)
-      : ''
-  if (code === 'permission-denied') {
-    return 'No tienes permiso para guardar la solicitud. Verifica que las reglas de Firestore incluyan la colección «solicitudes».'
-  }
-  return 'No se pudo enviar la solicitud. Intenta de nuevo.'
-}
-
 const enviar = async () => {
   if (!formularioCompleto.value) {
     await dialog.alert('Completa todos los pasos antes de enviar la solicitud.', { variant: 'warning' })
     return
   }
+  if (!hayConexion()) {
+    await alertaSinConexion()
+    return
+  }
+
   enviando.value = true
 
   try {
@@ -137,22 +146,7 @@ const enviar = async () => {
 
     let pdfUrl = ''
     if (archivo.value) {
-      const formDataCloud = new FormData()
-      formDataCloud.append('file', archivo.value)
-      formDataCloud.append('upload_preset', 'flexibilizaciones_pdf')
-
-      const res = await fetch(
-        'https://api.cloudinary.com/v1_1/dhbehhvb5/image/upload',
-        { method: 'POST', body: formDataCloud }
-      )
-      const data = await res.json()
-
-      if (!data.secure_url) {
-        await dialog.alert('Error al subir el PDF', { variant: 'error' })
-        enviando.value = false
-        return
-      }
-      pdfUrl = data.secure_url
+      pdfUrl = await subirPdfCloudinary(archivo.value)
     }
 
     const materia = materiaSeleccionada.value
@@ -173,17 +167,33 @@ const enviar = async () => {
       pdf_url: pdfUrl,
     })
 
-    void notificarDirectores({
-      titulo: 'Nueva solicitud de docente',
-      mensaje: `${docenteNombre.value || 'Un docente'} solicitó ausencia para ${materia ? labelMateria(materia) : formData.value.materiaCodigo}.`,
-      tipo: 'info',
-      ruta: '/director/solicitudes',
-    })
+    try {
+      await notificarDirectores({
+        titulo: 'Nueva solicitud de docente',
+        mensaje: `${docenteNombre.value || 'Un docente'} solicitó ausencia para ${materia ? labelMateria(materia) : formData.value.materiaCodigo}.`,
+        tipo: 'info',
+        ruta: '/director/solicitudes',
+      })
+    } catch (notifError) {
+      console.error('Solicitud guardada; falló notificación a directores:', notifError)
+      await dialog.alert(
+        'Tu solicitud se guardó correctamente, pero no pudimos avisar al director de inmediato. Aparecerá en su bandeja al sincronizar.',
+        { variant: 'warning', title: 'Envío parcial' },
+      )
+    }
 
+    await dialog.alert(
+      'Solicitud enviada correctamente. Recuerda: si la misma ausencia afecta a otra materia, debes crear una solicitud independiente por cada una.',
+      { variant: 'success', title: 'Solicitud enviada' },
+    )
     router.push('/docente/mis-solicitudes')
   } catch (error) {
     console.error('Error al enviar solicitud docente:', error)
-    await dialog.alert(mensajeErrorFirebase(error), { variant: 'error', title: 'Error' })
+    const reintentar = await confirmarReintento(mensajeErrorEnvio(error))
+    if (reintentar) {
+      enviando.value = false
+      await enviar()
+    }
   } finally {
     enviando.value = false
   }
@@ -224,6 +234,21 @@ const enviar = async () => {
 
     <!-- Step Content -->
     <div class="form-container">
+      <div class="form-info-banner" role="note">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="12" y1="8" x2="12" y2="12"/>
+          <line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+        <div>
+          <p class="form-info-title">Una solicitud por materia</p>
+          <p class="form-info-text">
+            Cada solicitud cubre <strong>una sola materia</strong>. Si tu ausencia afecta varias materias
+            en el mismo periodo, envía una solicitud por cada materia afectada (mismo PDF de soporte si aplica).
+          </p>
+        </div>
+      </div>
+
       <!-- Step 1: Type Selection -->
       <div v-if="currentStep === 1" class="step-content">
         <div class="step-header">
@@ -257,18 +282,18 @@ const enviar = async () => {
         <div class="form-grid">
           <div class="form-group">
             <label class="form-label">Fecha de inicio</label>
-            <input 
+            <SelectorFechaApp
               v-model="formData.fechaInicio"
-              type="date" 
-              class="form-input"
+              :max="formData.fechaFin || undefined"
+              compact
             />
           </div>
           <div class="form-group">
             <label class="form-label">Fecha de fin</label>
-            <input 
+            <SelectorFechaApp
               v-model="formData.fechaFin"
-              type="date" 
-              class="form-input"
+              :min="formData.fechaInicio || undefined"
+              compact
             />
           </div>
           <div class="form-group full-width">
@@ -282,6 +307,9 @@ const enviar = async () => {
                 {{ m.codigo }} — {{ m.nombre }}
               </option>
             </select>
+            <p v-if="materiasDocente.length > 1" class="form-hint form-hint--info">
+              Solo puedes elegir una materia aquí. Para otra materia afectada, completa y envía esta solicitud y luego crea una nueva.
+            </p>
           </div>
           <div class="form-group full-width">
             <label class="form-label">Descripcion</label>
@@ -339,12 +367,12 @@ const enviar = async () => {
           <label class="form-label">Fechas propuestas (hasta 3 opciones)</label>
           <p class="form-hint">Maximo 8 dias despues de la ausencia</p>
           <div class="dates-grid">
-            <div v-for="(_, index) in formData.fechasReprogramacion" :key="index" class="form-group">
+            <div v-for="(_, index) in formData.fechasReprogramacion" :key="index" class="form-group date-picker-group">
               <span class="date-label">Opcion {{ index + 1 }} {{ index === 0 ? '*' : '(opcional)' }}</span>
-              <input 
+              <SelectorFechaHoraApp
                 v-model="formData.fechasReprogramacion[index]"
-                type="datetime-local" 
-                class="form-input"
+                :min="minReprogramacion"
+                :max="maxReprogramacion"
               />
             </div>
           </div>
@@ -572,6 +600,42 @@ const enviar = async () => {
   color: var(--color-text);
 }
 
+.form-info-banner {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 14px 16px;
+  margin-bottom: 24px;
+  border-radius: var(--radius-lg);
+  border: 1px solid color-mix(in srgb, var(--color-primary) 25%, var(--color-border));
+  background: color-mix(in srgb, var(--color-primary) 8%, var(--color-surface));
+  color: var(--color-text-secondary);
+}
+
+.form-info-banner svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--color-primary);
+}
+
+.form-info-title {
+  margin: 0 0 4px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.form-info-text {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.form-hint--info {
+  margin-top: 6px;
+  color: var(--color-text-secondary);
+}
+
 .form-hint {
   font-size: 12px;
   color: var(--color-text-muted);
@@ -786,23 +850,85 @@ const enviar = async () => {
 
 @media (max-width: 768px) {
   .form-container {
-    padding: 24px;
+    padding: 20px 16px;
   }
-  
+
+  .step-content {
+    min-height: auto;
+  }
+
   .form-grid {
     grid-template-columns: 1fr;
   }
-  
+
   .repro-options {
     grid-template-columns: 1fr;
   }
-  
+
   .dates-grid {
     grid-template-columns: 1fr;
   }
-  
+
   .step-line {
-    width: 40px;
+    width: 32px;
+    margin: 0 4px 20px;
+  }
+
+  .step-label {
+    font-size: 11px;
+    text-align: center;
+  }
+
+  .form-info-banner {
+    flex-direction: column;
+    padding: 12px 14px;
+  }
+
+  .form-actions {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .form-actions > .btn-secondary {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .actions-right {
+    margin-left: 0;
+    width: 100%;
+    flex-direction: column;
+  }
+
+  .actions-right .btn,
+  .actions-right .btn-ghost {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .steps-container {
+    margin-bottom: 20px;
+  }
+
+  .step-number {
+    width: 28px;
+    height: 28px;
+    font-size: 12px;
+  }
+
+  .step-line {
+    width: 20px;
+  }
+
+  .repro-option {
+    padding: 12px;
+  }
+
+  .file-upload {
+    padding: 16px 12px;
   }
 }
 </style>

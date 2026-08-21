@@ -12,8 +12,12 @@ next.user-config.*
 .env.*
 .env*.local
 
-# Firebase local
+# Firebase / credentials
 .firebase/
+*serviceAccount*.json
+firebase-adminsdk*.json
+*.pem
+*.key
 
 # Common ignores
 node_modules

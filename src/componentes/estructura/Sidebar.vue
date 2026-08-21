@@ -10,8 +10,21 @@ const route = useRoute()
 const router = useRouter()
 const { isMobile, mobileOpen, isOpen, toggleSidebar, closeMobileMenu } = useSidebar()
 
+const inferRoleFromPath = (path: string): 'docente' | 'director' | 'estudiante' => {
+  if (path.startsWith('/docente')) return 'docente'
+  if (path.startsWith('/director')) return 'director'
+  if (path.startsWith('/estudiante')) return 'estudiante'
+  return 'estudiante'
+}
+
+const roleFromStorage = (): 'docente' | 'director' | 'estudiante' => {
+  const rol = localStorage.getItem('rol')
+  if (rol) return mapRolMenu(rol)
+  return inferRoleFromPath(route.path)
+}
+
 // ── Estado del menú ──────────────────────────────────────────────
-const role = ref<'docente' | 'director' | 'estudiante'>('estudiante')
+const role = ref<'docente' | 'director' | 'estudiante'>(roleFromStorage())
 
 // ── Cargar rol del usuario ───────────────────────────────────────
 onMounted(async () => {
@@ -23,6 +36,15 @@ onMounted(async () => {
 
   role.value = mapRolMenu(sesion.rol)
 })
+
+watch(
+  () => route.path,
+  (path) => {
+    if (!localStorage.getItem('rol')) {
+      role.value = inferRoleFromPath(path)
+    }
+  },
+)
 
 // ── Menú dinámico ────────────────────────────────────────────────
 const menuItems = computed(() => {
@@ -63,7 +85,14 @@ const menuItems = computed(() => {
 })
 
 // ── Ruta activa ──────────────────────────────────────────────────
-const isActive = (path: string) => route.path === path
+const isActive = (path: string) => {
+  const current = route.path
+  if (current === path) return true
+  if (path === '/director' || path === '/estudiante' || path === '/docente/dashboard') {
+    return false
+  }
+  return current.startsWith(`${path}/`)
+}
 
 const onNavClick = () => {
   if (isMobile.value) closeMobileMenu()

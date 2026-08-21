@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { validarTamanoPdf, esPdfValido } from '@/lib/nucleo/archivos'
 
 const props = withDefaults(defineProps<{
   fileName?: string
@@ -19,11 +19,16 @@ const emit = defineEmits<{
 const dragging = ref(false)
 const inputRef = ref<HTMLInputElement | null>(null)
 
-const esPdf = (file: File) =>
-  file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')
+const esPdf = (file: File) => esPdfValido(file)
 
 const procesarArchivo = (file: File | undefined | null) => {
   if (!file) return
+  const tamanoError = validarTamanoPdf(file)
+  if (tamanoError) {
+    emit('error', tamanoError)
+    if (inputRef.value) inputRef.value.value = ''
+    return
+  }
   if (esPdf(file)) {
     emit('select', file)
   } else {

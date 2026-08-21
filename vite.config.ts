@@ -1,6 +1,8 @@
-import { defineConfig } from 'vite'
+import { defineConfig, type Plugin } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import { fileURLToPath, URL } from 'node:url'
+import { writeFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 
 function vendorChunk(id: string): string | undefined {
   if (!id.includes('node_modules')) return undefined
@@ -32,8 +34,22 @@ function vendorChunk(id: string): string | undefined {
   return undefined
 }
 
+function atavVersionPlugin(): Plugin {
+  return {
+    name: 'atav-version',
+    apply: 'build',
+    closeBundle() {
+      const builtAt = new Date().toISOString()
+      writeFileSync(
+        resolve(__dirname, 'dist/version.json'),
+        JSON.stringify({ version: builtAt, builtAt }),
+      )
+    },
+  }
+}
+
 export default defineConfig({
-  plugins: [vue()],
+  plugins: [vue(), atavVersionPlugin()],
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),

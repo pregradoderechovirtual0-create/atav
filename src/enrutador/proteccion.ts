@@ -7,6 +7,7 @@ import {
   cerrarSesion,
   marcarMotivoCierreSesion,
 } from '@/lib/autenticacion/session'
+import { esErrorCargaChunk, recargarPorChunkDesactualizado } from '@/lib/nucleo/chunkReload'
 
 export function registerRouterGuards(router: Router) {
   router.beforeEach(async (to, _from, next) => {
@@ -51,6 +52,7 @@ export function registerRouterGuards(router: Router) {
 
   router.onError(error => {
     console.error('Error de navegación:', error)
+    if (esErrorCargaChunk(error) && recargarPorChunkDesactualizado()) return
     router.push({ name: 'error', params: { code: '500' } }).catch(() => {})
   })
 }

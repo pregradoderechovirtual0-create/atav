@@ -77,13 +77,13 @@ const extraerFecha = (timestamp: any): { iso: string; sort: number } => {
   }
 }
 
-const formatFechaCorta = (iso: string) => {
+export const formatFechaISO = (iso: string) => {
   if (!iso) return '—'
   const [y, m, d] = iso.split('-')
   return `${d}/${m}/${y}`
 }
 
-const formatFechaHora = (valor: string) => {
+export const formatFechaHoraSolicitud = (valor: string) => {
   if (!valor) return ''
   if (valor.includes('T')) {
     const [fecha, hora] = valor.split('T')
@@ -91,14 +91,14 @@ const formatFechaHora = (valor: string) => {
     const hh = hora?.slice(0, 5) || ''
     return `${d}/${m}/${y} ${hh}`
   }
-  return formatFechaCorta(valor)
+  return formatFechaISO(valor)
 }
 
 const reprogramacionResumen = (data: Record<string, any>) => {
   const tipo = labelTipoReprogramacion(data.tipo_reprogramacion || '')
   const fechas = (data.fechas_reprogramacion || []).filter(Boolean)
   if (!fechas.length) return tipo || '—'
-  return `${tipo} · ${formatFechaHora(fechas[0])}`
+  return `${tipo} · ${formatFechaHoraSolicitud(fechas[0])}`
 }
 
 export const mapDocSolicitud = (id: string, data: Record<string, any>): SolicitudDocente => {

@@ -203,7 +203,48 @@ const filtros = computed(() => [
 .pagination-info { font-size: 13px; color: var(--color-text-muted); }
 
 @media (max-width: 768px) {
-  .solicitud-main { flex-direction: column; }
-  .solicitud-right { flex-direction: row; align-items: center; }
+  .toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .btn-primary {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .filter-tabs {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    padding-bottom: 4px;
+  }
+
+  .solicitud-main {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .solicitud-right {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+  }
+
+  .solicitud-repro {
+    word-break: break-word;
+  }
+}
+
+@media (max-width: 480px) {
+  .filter-tab {
+    font-size: 12px;
+    padding: 7px 11px;
+    flex-shrink: 0;
+  }
+
+  .solicitud-card {
+    padding: 12px 14px;
+  }
 }
 </style>

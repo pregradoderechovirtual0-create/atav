@@ -1,4 +1,4 @@
-import { collection, getDocs, type QuerySnapshot, type DocumentData } from 'firebase/firestore'
+import { collection, getDocs, onSnapshot, type QuerySnapshot, type DocumentData, type Unsubscribe } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { obtenerSesion } from '@/lib/autenticacion/session'
 import { labelEstadoUI } from '@/lib/solicitudes/dashboardSolicitudes'
@@ -33,6 +33,7 @@ export interface SolicitudDirector {
   fecha_fin?: string
   tipo_reprogramacion?: string
   fechas_reprogramacion?: string[]
+  tipo_ausentismo?: string
 }
 
 const tsSeconds = (ts: unknown): number => {
@@ -78,6 +79,7 @@ export function mapSnapSolicitudesDirector(
       motivo_rechazo: String(data.motivo_rechazo || ''),
       fecha_inicio: data.fecha_inicio as string | undefined,
       fecha_fin: data.fecha_fin as string | undefined,
+      tipo_ausentismo: data.tipo_ausentismo as string | undefined,
       tipo_reprogramacion: data.tipo_reprogramacion as string | undefined,
       fechas_reprogramacion: (data.fechas_reprogramacion as string[]) || [],
       pdf_url: String(data.pdf_url || ''),
@@ -180,6 +182,46 @@ export async function fetchSolicitudesDirector(materias: MateriaRegistrada[]): P
   ])
 
   return mapSnapSolicitudesDirector(snapSolicitudes, snapFlex, snapSup, snapHab, materias)
+}
+
+type SnapLike = { docs: Array<{ id: string; data: () => Record<string, unknown> }> }
+
+/** Escucha cambios en tiempo real en las 4 colecciones de solicitudes. */
+export function subscribeSolicitudesDirector(
+  materias: MateriaRegistrada[],
+  onUpdate: (solicitudes: SolicitudDirector[]) => void,
+  onError?: (error: unknown) => void,
+): Unsubscribe {
+  const state: Record<'solicitudes' | 'flex' | 'sup' | 'hab', SnapLike> = {
+    solicitudes: { docs: [] },
+    flex: { docs: [] },
+    sup: { docs: [] },
+    hab: { docs: [] },
+  }
+
+  const emit = () => {
+    onUpdate(mapSnapSolicitudesDirector(state.solicitudes, state.flex, state.sup, state.hab, materias))
+  }
+
+  const collections: Array<[string, keyof typeof state]> = [
+    ['solicitudes', 'solicitudes'],
+    ['flexibilizaciones', 'flex'],
+    ['supletorios', 'sup'],
+    ['habilitaciones', 'hab'],
+  ]
+
+  const unsubs = collections.map(([name, key]) =>
+    onSnapshot(
+      collection(db, name),
+      (snap) => {
+        state[key] = snap
+        emit()
+      },
+      (err) => onError?.(err),
+    ),
+  )
+
+  return () => unsubs.forEach(u => u())
 }
 
 export function nombreSolicitudDirector(s: SolicitudDirector): string {

@@ -10,7 +10,8 @@ import {
   establecerClaveAutorizacionJefa,
 } from '@/lib/director/claves'
 import { sanitizarUsuario } from '@/lib/autenticacion/usuarioSeguro'
-import { labelRol, ROL_JEFA_SUPREMA } from '@/lib/nucleo/roles'
+import { labelRol, ROL_JEFA_SUPREMA, esRolDirector } from '@/lib/nucleo/roles'
+import { sincronizarIndiceDirectorUid, quitarIndiceDirectorUid } from '@/lib/autenticacion/directorUidIndex'
 import TableDetailModal from '@/componentes/modales/TableDetailModal.vue'
 import ExcelImportGuideModal from '@/componentes/modales/ExcelImportGuideModal.vue'
 import { buildDetailFields } from '@/lib/nucleo/tableDetail'
@@ -245,6 +246,13 @@ const guardarEdicion = async () => {
     guardandoEdicion.value = true
     await updateDoc(doc(db, 'usuarios', usuarioEditando.value.id), { cedula, nombre, correo, rol })
 
+    const authUid = (usuarioEditando.value.auth_uid || '').toString()
+    if (authUid && esRolDirector(rol)) {
+      await sincronizarIndiceDirectorUid(authUid, rol, cedula)
+    } else if (authUid) {
+      await quitarIndiceDirectorUid(authUid)
+    }
+
     usuarioEditando.value.cedula = cedula
     usuarioEditando.value.nombre = nombre
     usuarioEditando.value.correo = correo
@@ -395,7 +403,7 @@ const importarArchivo = async (event: Event) => {
 </script>
 
 <template>
-  <div class="usuarios-page">
+  <div class="director-list-page">
 
     <section class="command-bar">
       <div class="command-row">
@@ -704,14 +712,14 @@ const importarArchivo = async (event: Event) => {
             <div class="modal-footer modal-footer-edit">
               <router-link
                 v-if="usuarioEditando"
-                :to="`/director/restablecer-password/${usuarioEditando.id}`"
+                :to="`/director/reactivar-cuenta/${usuarioEditando.id}`"
                 class="btn-reset-link"
                 @click="cerrarModal"
               >
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0 3 3L22 7l-3-3m-3.5 3.5L19 4"/>
                 </svg>
-                Restablecer contraseña
+                Reactivar cuenta
               </router-link>
 
               <div class="actions-right">
@@ -787,7 +795,7 @@ const importarArchivo = async (event: Event) => {
 </template>
 
 <style scoped>
-.usuarios-page {
+.director-list-page {
   display: flex;
   flex-direction: column;
   gap: 16px;

@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { db } from '@/lib/firebase'
 import { doc, getDoc } from 'firebase/firestore'
 import { dialog } from '@/lib/nucleo/dialog'
-import { restablecerPasswordUsuario } from '@/lib/autenticacion/resetPassword'
+import { restablecerPasswordUsuario, ResetPasswordError } from '@/lib/autenticacion/resetPassword'
 
 const route = useRoute()
 const router = useRouter()
@@ -73,18 +73,21 @@ const cambiarPasswordAdmin = async () => {
 
   try {
     cambiando.value = true
-    const { authSincronizado } = await restablecerPasswordUsuario(cedula, nuevaPassword.value)
+    await restablecerPasswordUsuario(cedula, nuevaPassword.value)
 
-    mensaje.value = authSincronizado
-      ? 'Contraseña actualizada. El usuario debe ir a Iniciar sesión (no a Activar cuenta) con la nueva clave.'
-      : 'Contraseña guardada. El usuario debe ir a Iniciar sesión con la clave asignada (no a Activar cuenta).'
+    mensaje.value =
+      'Contraseña temporal asignada. El usuario debe iniciar sesión con esa clave y el sistema le pedirá crear su contraseña personal.'
     mensajeTipo.value = 'ok'
     nuevaPassword.value = ''
     confirmarPassword.value = ''
     setTimeout(() => router.push('/director/usuarios'), 1800)
   } catch (error) {
     console.error(error)
-    mensaje.value = error instanceof Error ? error.message : 'No se pudo cambiar la contraseña.'
+    if (error instanceof ResetPasswordError) {
+      mensaje.value = error.message
+    } else {
+      mensaje.value = error instanceof Error ? error.message : 'No se pudo cambiar la contraseña.'
+    }
     mensajeTipo.value = 'error'
   } finally {
     cambiando.value = false

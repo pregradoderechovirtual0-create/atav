@@ -101,14 +101,13 @@ const obtenerUidsDirectores = async (): Promise<string[]> => {
 export const notificarDirectores = async (
   input: Omit<CrearNotificacionInput, 'usuario_id'>
 ) => {
-  try {
-    const uids = await obtenerUidsDirectores()
-    if (!uids.length) return
-
-    await Promise.all(uids.map(uid => crearNotificacion({ ...input, usuario_id: uid })))
-  } catch (error) {
-    console.warn('No se pudieron enviar notificaciones a directores:', error)
+  const uids = await obtenerUidsDirectores()
+  if (!uids.length) {
+    console.warn('No hay directores con UID vinculado para notificar.')
+    return
   }
+
+  await Promise.all(uids.map(uid => crearNotificacion({ ...input, usuario_id: uid })))
 }
 
 export const rutaNotificacionEstudiante = (tipo: string): string => {

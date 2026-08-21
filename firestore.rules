@@ -55,6 +55,46 @@ service cloud.firestore {
       return ['rol', 'password_hash', 'auth_uid', 'registrado'];
     }
 
+    function esUidDirectorRegistrado(uid) {
+      return uid is string
+        && uid.size() > 0
+        && exists(/databases/$(database)/documents/indices/director_uids/$(uid));
+    }
+
+    function camposNotificacionValidos() {
+      return request.resource.data.keys().hasOnly([
+          'usuario_id', 'titulo', 'mensaje', 'tipo', 'leida', 'ruta', 'fecha_creacion',
+        ])
+        && request.resource.data.usuario_id is string
+        && request.resource.data.usuario_id.size() > 0
+        && request.resource.data.titulo is string
+        && request.resource.data.titulo.size() > 0
+        && request.resource.data.titulo.size() <= 120
+        && request.resource.data.mensaje is string
+        && request.resource.data.mensaje.size() > 0
+        && request.resource.data.mensaje.size() <= 500
+        && request.resource.data.tipo in ['success', 'info', 'warning', 'error']
+        && request.resource.data.leida == false
+        && (!('ruta' in request.resource.data) || request.resource.data.ruta == null || request.resource.data.ruta is string);
+    }
+
+    function camposSolicitudDirectorUpdate() {
+      return request.resource.data.diff(resource.data).affectedKeys()
+        .hasOnly(['estado', 'motivo_rechazo', 'historial', 'actualizado_en']);
+    }
+
+    function estadoSolicitudEstudianteValido() {
+      return request.resource.data.estado == 'pendiente'
+        && (!('motivo_rechazo' in request.resource.data) || request.resource.data.motivo_rechazo == '');
+    }
+
+    match /indices/director_uids/{uid} {
+      allow read: if isAuthenticated();
+      allow create, update: if esDirector()
+        || (isRealUser() && request.auth.uid == uid && esDirector());
+      allow delete: if esDirector();
+    }
+
     match /auth_vinculos/{authUid} {
       allow read: if isAuthenticated() && request.auth.uid == authUid;
       allow create: if isAuthenticated()
@@ -64,6 +104,8 @@ service cloud.firestore {
         && (
           get(/databases/$(database)/documents/usuarios/$(request.resource.data.cedula)).data.authDesincronizado == true
           || get(/databases/$(database)/documents/usuarios/$(request.resource.data.cedula)).data.passwordTemporal == true
+          || get(/databases/$(database)/documents/usuarios/$(request.resource.data.cedula)).data.requiereCambioPassword == true
+          || get(/databases/$(database)/documents/usuarios/$(request.resource.data.cedula)).data.registrado == false
         );
       allow delete: if isAuthenticated() && request.auth.uid == authUid;
     }
@@ -75,9 +117,12 @@ service cloud.firestore {
         || (isRealUser() && esPerfilDirector())
         || (resource != null && resource.data.registrado == false)
         || (resource != null && resource.data.authDesincronizado == true)
-        || (resource != null && resource.data.passwordTemporal == true);
+        || (resource != null && resource.data.passwordTemporal == true)
+        || (resource != null && resource.data.requiereCambioPassword == true);
 
-      allow list: if esDirector();
+      allow list: if esDirector()
+        || (isAuthenticated()
+          && resource.data.rol in ['Director', 'Jefa Suprema']);
 
       allow create: if esDirector()
         && request.resource.data.rol in ['Docente', 'Estudiante', 'Director', 'Jefa Suprema'];
@@ -89,6 +134,10 @@ service cloud.firestore {
           && resource.data.registrado == false
           && request.resource.data.registrado == true
           && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['rol'])
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'registrado', 'requiereCambioPassword', 'passwordTemporal', 'reactivacionPendiente',
+            'password_hash', 'auth_uid', 'authDesincronizado',
+          ])
         )
         || (
           isRealUser()
@@ -105,11 +154,28 @@ service cloud.firestore {
           isAuthenticated()
           && request.auth.token.firebase.sign_in_provider == 'anonymous'
           && (resource.data.authDesincronizado == true || resource.data.passwordTemporal == true)
-          && request.resource.data.auth_uid == request.auth.uid
-          && request.resource.data.authDesincronizado == false
           && request.resource.data.passwordTemporal == false
+          && request.resource.data.authDesincronizado == resource.data.authDesincronizado
+          && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['auth_uid', 'rol', 'password_hash', 'registrado'])
           && request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['auth_uid', 'authDesincronizado', 'passwordTemporal', 'claveTemporal'])
+            .hasOnly(['passwordTemporal', 'claveTemporal'])
+        )
+        || (
+          isRealUser()
+          && cedulaAuth() == userId
+          && resource.data.requiereCambioPassword == true
+          && request.resource.data.requiereCambioPassword == false
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['password_hash', 'requiereCambioPassword', 'authDesincronizado', 'auth_uid', 'passwordTemporal', 'claveTemporal', 'reactivacionPendiente'])
+        )
+        || (
+          isAuthenticated()
+          && request.auth.token.firebase.sign_in_provider == 'anonymous'
+          && resource.data.requiereCambioPassword == true
+          && request.resource.data.requiereCambioPassword == false
+          && get(/databases/$(database)/documents/auth_vinculos/$(request.auth.uid)).data.cedula == userId
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['password_hash', 'requiereCambioPassword', 'authDesincronizado', 'auth_uid', 'passwordTemporal', 'claveTemporal', 'reactivacionPendiente'])
         );
 
       allow delete: if esDirector();
@@ -122,14 +188,18 @@ service cloud.firestore {
       allow create: if isAuthenticated()
         && esDocente()
         && request.resource.data.usuario_id == request.auth.uid
+        && request.resource.data.estado == 'creada'
+        && request.resource.data.tipo == 'inasistencia'
         && request.resource.data.descripcion is string
         && request.resource.data.descripcion.size() > 0
         && request.resource.data.materia_codigo is string
         && request.resource.data.materia_codigo.size() > 0
         && request.resource.data.fecha_inicio is string
         && request.resource.data.fecha_fin is string
-        && request.resource.data.tipo_reprogramacion is string;
-      allow update, delete: if esDirector();
+        && request.resource.data.tipo_reprogramacion is string
+        && (!('motivo_rechazo' in request.resource.data) || request.resource.data.motivo_rechazo == '');
+      allow update: if esDirector() && camposSolicitudDirectorUpdate();
+      allow delete: if esDirector();
     }
 
     match /flexibilizaciones/{docId} {
@@ -139,9 +209,12 @@ service cloud.firestore {
       allow create: if isAuthenticated()
         && esEstudiante()
         && request.resource.data.estudiante_id == request.auth.uid
+        && estadoSolicitudEstudianteValido()
         && request.resource.data.nombre is string
-        && request.resource.data.nombre.size() > 0;
-      allow update, delete: if esDirector();
+        && request.resource.data.nombre.size() > 0
+        && request.resource.data.parcial in ['1', '2', '3'];
+      allow update: if esDirector() && camposSolicitudDirectorUpdate();
+      allow delete: if esDirector();
     }
 
     match /habilitaciones/{docId} {
@@ -150,8 +223,10 @@ service cloud.firestore {
         || (isAuthenticated() && resource.data.estudiante_id == request.auth.uid);
       allow create: if isAuthenticated()
         && esEstudiante()
-        && request.resource.data.estudiante_id == request.auth.uid;
-      allow update, delete: if esDirector();
+        && request.resource.data.estudiante_id == request.auth.uid
+        && estadoSolicitudEstudianteValido();
+      allow update: if esDirector() && camposSolicitudDirectorUpdate();
+      allow delete: if esDirector();
     }
 
     match /supletorios/{docId} {
@@ -160,22 +235,28 @@ service cloud.firestore {
         || (isAuthenticated() && resource.data.estudiante_id == request.auth.uid);
       allow create: if isAuthenticated()
         && esEstudiante()
-        && request.resource.data.estudiante_id == request.auth.uid;
-      allow update, delete: if esDirector();
+        && request.resource.data.estudiante_id == request.auth.uid
+        && estadoSolicitudEstudianteValido();
+      allow update: if esDirector() && camposSolicitudDirectorUpdate();
+      allow delete: if esDirector();
     }
 
     match /notificaciones/{docId} {
       allow read, update: if isAuthenticated()
         && resource.data.usuario_id == request.auth.uid;
       allow create: if isAuthenticated()
-        && request.resource.data.usuario_id is string
-        && request.resource.data.titulo is string
-        && request.resource.data.titulo.size() > 0
-        && request.resource.data.titulo.size() <= 120
-        && request.resource.data.mensaje is string
-        && request.resource.data.mensaje.size() <= 500
-        && request.resource.data.leida == false
-        && (esDirector() || esDocente() || esEstudiante());
+        && camposNotificacionValidos()
+        && (
+          (esDirector()
+            && request.resource.data.usuario_id != request.auth.uid
+            && request.resource.data.ruta is string
+            && !request.resource.data.ruta.matches('^/director/'))
+          || ((esDocente() || esEstudiante())
+            && request.resource.data.ruta is string
+            && request.resource.data.ruta.matches('^/director/')
+            && request.resource.data.usuario_id != request.auth.uid
+            && esUidDirectorRegistrado(request.resource.data.usuario_id))
+        );
       allow delete: if esDirector();
     }
 

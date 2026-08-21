@@ -1,14 +1,23 @@
 <script setup lang="ts">
-import { onMounted, ref, computed } from 'vue'
+import { onMounted, onUnmounted, ref, computed } from 'vue'
 import { db } from '@/lib/firebase'
-import { updateDoc, doc, deleteDoc } from 'firebase/firestore'
+import { updateDoc, doc, deleteDoc, arrayUnion, serverTimestamp } from 'firebase/firestore'
 import { crearNotificacion, rutaNotificacionEstudiante } from '@/lib/dominio/notificaciones'
 import {
   formatFechaParcial,
   formatHoraParcial,
 } from '@/lib/dominio/flexibilidadCatalogo'
 import { fetchMaterias, type MateriaRegistrada } from '@/lib/dominio/materias'
-import { fetchSolicitudesDirector, type SolicitudDirector } from '@/lib/director/directorSolicitudesAggregate'
+import {
+  subscribeSolicitudesDirector,
+  type SolicitudDirector,
+} from '@/lib/director/directorSolicitudesAggregate'
+import {
+  labelTipoReprogramacion,
+  labelTipoAusentismo,
+  formatFechaISO,
+  formatFechaHoraSolicitud,
+} from '@/lib/solicitudes/docenteSolicitudes'
 import { dialog } from '@/lib/nucleo/dialog'
 
 const solicitudes = ref<SolicitudDirector[]>([])
@@ -50,17 +59,33 @@ const tipoLabel: Record<string, string> = {
 
 const cargarSolicitudes = async () => {
   try {
-    solicitudes.value = await fetchSolicitudesDirector(materiasRegistradas.value)
+    materiasRegistradas.value = await fetchMaterias()
   } catch (e) {
     console.error(e)
-  } finally {
-    loading.value = false
   }
 }
 
+let unsubSolicitudes: (() => void) | null = null
+
 onMounted(async () => {
-  materiasRegistradas.value = await fetchMaterias()
   await cargarSolicitudes()
+  loading.value = true
+  unsubSolicitudes = subscribeSolicitudesDirector(
+    materiasRegistradas.value,
+    (lista) => {
+      solicitudes.value = lista
+      loading.value = false
+    },
+    (err) => {
+      console.error(err)
+      loading.value = false
+    },
+  )
+})
+
+onUnmounted(() => {
+  unsubSolicitudes?.()
+  unsubSolicitudes = null
 })
 
 const solicitudesFiltradas = computed(() => {
@@ -123,7 +148,16 @@ const estadoGuardar = nuevoEstado.toLowerCase()
  
   try {
     // 1. Actualizar estado en Firestore
-    const payload: any = { estado: estadoGuardar }
+    const payload: Record<string, unknown> = {
+      estado: estadoGuardar,
+      actualizado_en: serverTimestamp(),
+      historial: arrayUnion({
+        accion: accionPendiente.value,
+        estado: estadoGuardar,
+        en: new Date().toISOString(),
+        ...(accionPendiente.value === 'rechazar' ? { motivo: motivoRechazo.value.trim() } : {}),
+      }),
+    }
     if (accionPendiente.value === 'rechazar') {
       payload.motivo_rechazo = motivoRechazo.value.trim()
     }
@@ -236,6 +270,9 @@ const inicialesNombre = (nombre: string) => {
   if (!nombre) return '?'
   return nombre.split(' ').slice(0, 2).map((n: string) => n[0]).join('').toUpperCase()
 }
+
+const fechasReprogramacionLista = (sol: SolicitudDirector) =>
+  (sol.fechas_reprogramacion || []).filter(Boolean)
 </script>
 
 <template>
@@ -457,7 +494,70 @@ const inicialesNombre = (nombre: string) => {
                 </div>
               </section>
 
-              <section class="detail-section" v-else>
+              <section class="detail-section" v-if="solicitudSeleccionada.tipo === 'inasistencia'">
+                <div class="detail-section-head">
+                  <span class="detail-section-icon detail-section-icon--accent">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                      <line x1="16" y1="2" x2="16" y2="6"/>
+                      <line x1="8" y1="2" x2="8" y2="6"/>
+                      <line x1="3" y1="10" x2="21" y2="10"/>
+                    </svg>
+                  </span>
+                  <h3 class="detail-section-title">Periodo de ausencia</h3>
+                </div>
+                <div class="detail-grid detail-grid--3">
+                  <div class="detail-item">
+                    <span class="detail-label">Tipo de ausentismo</span>
+                    <span class="detail-value">{{ labelTipoAusentismo(solicitudSeleccionada.tipo_ausentismo || '') || '—' }}</span>
+                  </div>
+                  <div class="detail-item">
+                    <span class="detail-label">Fecha de inicio</span>
+                    <span class="detail-value">{{ formatFechaISO(solicitudSeleccionada.fecha_inicio || '') }}</span>
+                  </div>
+                  <div class="detail-item">
+                    <span class="detail-label">Fecha de fin</span>
+                    <span class="detail-value">{{ formatFechaISO(solicitudSeleccionada.fecha_fin || '') }}</span>
+                  </div>
+                  <div class="detail-item detail-item--wide">
+                    <span class="detail-label">Materia afectada</span>
+                    <span class="detail-value">{{ solicitudSeleccionada.materia ?? '—' }}</span>
+                  </div>
+                </div>
+              </section>
+
+              <section class="detail-section" v-if="solicitudSeleccionada.tipo === 'inasistencia'">
+                <div class="detail-section-head">
+                  <span class="detail-section-icon detail-section-icon--accent">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <circle cx="12" cy="12" r="10"/>
+                      <polyline points="12 6 12 12 16 14"/>
+                    </svg>
+                  </span>
+                  <h3 class="detail-section-title">Reprogramación propuesta</h3>
+                </div>
+                <div class="detail-grid detail-grid--2">
+                  <div class="detail-item detail-item--wide">
+                    <span class="detail-label">Tipo de reprogramación</span>
+                    <span class="detail-value detail-value--highlight">
+                      {{ labelTipoReprogramacion(solicitudSeleccionada.tipo_reprogramacion || '') || '—' }}
+                    </span>
+                  </div>
+                </div>
+                <div v-if="fechasReprogramacionLista(solicitudSeleccionada).length" class="repro-opciones">
+                  <div
+                    v-for="(fecha, idx) in fechasReprogramacionLista(solicitudSeleccionada)"
+                    :key="idx"
+                    class="repro-opcion"
+                  >
+                    <span class="repro-opcion-num">Opción {{ idx + 1 }}</span>
+                    <span class="repro-opcion-fecha">{{ formatFechaHoraSolicitud(fecha) }}</span>
+                  </div>
+                </div>
+                <p v-else class="detail-text detail-text--muted">Sin fechas propuestas</p>
+              </section>
+
+              <section class="detail-section" v-else-if="solicitudSeleccionada.tipo !== 'flexibilizacion'">
                 <div class="detail-section-head">
                   <span class="detail-section-icon detail-section-icon--accent">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -516,7 +616,7 @@ const inicialesNombre = (nombre: string) => {
                 <p class="detail-text">{{ solicitudSeleccionada.motivo ?? '—' }}</p>
               </section>
 
-              <section v-if="solicitudSeleccionada.descripcion" class="detail-section">
+              <section v-if="solicitudSeleccionada.descripcion && solicitudSeleccionada.tipo !== 'inasistencia'" class="detail-section">
                 <div class="detail-section-head">
                   <span class="detail-section-icon">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -863,12 +963,162 @@ const inicialesNombre = (nombre: string) => {
   background: none;
   border: none;
 }
+.detail-text--muted { color: var(--color-text-muted); font-style: italic; }
+
+.repro-opciones {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+.repro-opcion {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  background: var(--color-background);
+  border: 1px solid var(--color-border-light);
+}
+.repro-opcion-num {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--color-text-muted);
+  min-width: 72px;
+}
+.repro-opcion-fecha {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text);
+}
 
 @media (max-width: 768px) {
-  .modal-card--detail { max-width: 100%; }
-  .detail-grid--3, .detail-grid--2 { grid-template-columns: 1fr; }
-  .detail-item--wide { grid-column: span 1; }
-  .detail-hero { flex-direction: column; align-items: flex-start; }
+  .toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .filter-tabs {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .search-wrapper {
+    max-width: none;
+    width: 100%;
+  }
+
+  .request-item {
+    flex-direction: column;
+    padding: 16px;
+    gap: 12px;
+  }
+
+  .request-motivo {
+    white-space: normal;
+    max-width: none;
+  }
+
+  .request-actions {
+    width: 100%;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .action-btn {
+    flex: 1 1 calc(50% - 4px);
+    justify-content: center;
+    min-height: 40px;
+  }
+
+  .modal-overlay {
+    padding: 12px;
+    align-items: flex-end;
+  }
+
+  .modal-card--detail {
+    max-width: 100%;
+    max-height: 92vh;
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+  }
+
+  .modal-header--detail {
+    padding: 20px 16px 16px;
+  }
+
+  .modal-body--detail {
+    padding: 4px 16px 20px;
+  }
+
+  .modal-footer--detail {
+    padding: 12px 16px 20px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .modal-footer--detail .btn {
+    flex: 1 1 auto;
+    justify-content: center;
+    min-width: calc(50% - 4px);
+  }
+
+  .detail-grid--3,
+  .detail-grid--2 {
+    grid-template-columns: 1fr;
+  }
+
+  .detail-item--wide {
+    grid-column: span 1;
+  }
+
+  .detail-hero {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .toast-success {
+    left: 16px;
+    right: 16px;
+    bottom: 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .filter-tab {
+    padding: 7px 11px;
+    font-size: 12px;
+    flex-shrink: 0;
+  }
+
+  .request-item {
+    padding: 14px 12px;
+  }
+
+  .request-actions {
+    flex-direction: column;
+  }
+
+  .action-btn {
+    flex: 1 1 100%;
+    width: 100%;
+  }
+
+  .modal-footer--detail .btn {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .repro-opcion {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
 }
 
 .confirm-text { font-size: 13px; color: var(--color-text-secondary); margin: 0; line-height: 1.6; }

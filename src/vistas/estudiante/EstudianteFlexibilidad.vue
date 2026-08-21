@@ -8,6 +8,13 @@ import { obtenerSesion, esperarAuth } from '@/lib/autenticacion/session'
 import { notificarDirectores } from '@/lib/dominio/notificaciones'
 import { confirmarSolicitudEstudiante } from '@/lib/solicitudes/confirmarSolicitudEstudiante'
 import { dialog } from '@/lib/nucleo/dialog'
+import {
+  alertaSinConexion,
+  confirmarReintento,
+  hayConexion,
+  mensajeErrorEnvio,
+  subirPdfCloudinary,
+} from '@/lib/nucleo/erroresOperacion'
 import { CAUSAS_FLEXIBILIDAD, labelCausaFlexibilidad, formatFechaParcial, formatHoraParcial, esCorreoInstitucionalUsc } from '@/lib/dominio/flexibilidadCatalogo'
 import {
   fetchMaterias,
@@ -352,28 +359,17 @@ const onPdfError = (mensaje: string) => {
 const enviar = async () => {
   const user = auth.currentUser
   if (!user || !formularioCompleto.value) return
+  if (!hayConexion()) {
+    await alertaSinConexion()
+    return
+  }
 
   subiendoPdf.value = true
 
   try {
     let pdfUrl = ''
     if (formData.value.archivo) {
-      const formDataCloud = new FormData()
-      formDataCloud.append('file', formData.value.archivo as File)
-      formDataCloud.append('upload_preset', 'flexibilizaciones_pdf')
-
-      const res = await fetch(
-        'https://api.cloudinary.com/v1_1/dhbehhvb5/image/upload',
-        { method: 'POST', body: formDataCloud }
-      )
-      const data = await res.json()
-
-      if (!data.secure_url) {
-        mostrarToast('Error al subir el PDF', 'error')
-        subiendoPdf.value = false
-        return
-      }
-      pdfUrl = data.secure_url
+      pdfUrl = await subirPdfCloudinary(formData.value.archivo as File)
     }
 
     await addDoc(collection(db, 'flexibilizaciones'), {
@@ -396,12 +392,20 @@ const enviar = async () => {
       fecha_creacion: serverTimestamp()
     })
 
-    await notificarDirectores({
-      titulo: 'Nueva solicitud de flexibilización',
-      mensaje: `${nombreEstudiante.value} solicitó flexibilización para ${cursoSeleccionadoLabel.value} (Parcial ${formData.value.parcial}).`,
-      tipo: 'info',
-      ruta: '/director/solicitudes',
-    })
+    try {
+      await notificarDirectores({
+        titulo: 'Nueva solicitud de flexibilización',
+        mensaje: `${nombreEstudiante.value} solicitó flexibilización para ${cursoSeleccionadoLabel.value} (Parcial ${formData.value.parcial}).`,
+        tipo: 'info',
+        ruta: '/director/solicitudes',
+      })
+    } catch (notifError) {
+      console.error('Flexibilización guardada; falló notificación:', notifError)
+      await dialog.alert(
+        'Tu solicitud se guardó, pero no pudimos avisar al director de inmediato. Aparecerá en su bandeja al sincronizar.',
+        { variant: 'warning', title: 'Envío parcial' },
+      )
+    }
 
     await cargarSolicitudes(user.uid)
     currentStep.value = 1
@@ -416,9 +420,15 @@ const enviar = async () => {
     mostrarToast('Solicitud enviada correctamente')
   } catch (error) {
     console.error('Error al enviar:', error)
-    mostrarToast('Hubo un error al enviar la solicitud', 'error')
+    const reintentar = await confirmarReintento(mensajeErrorEnvio(error))
+    if (reintentar) {
+      subiendoPdf.value = false
+      await enviar()
+    } else {
+      mostrarToast(mensajeErrorEnvio(error), 'error')
+    }
   } finally {
-    subiendoPdf.value = false  // 👈 desactiva siempre al final
+    subiendoPdf.value = false
   }
 }
 

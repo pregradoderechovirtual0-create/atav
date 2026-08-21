@@ -11,6 +11,13 @@ import { obtenerSesion, esperarAuth } from '@/lib/autenticacion/session'
 import { notificarDirectores } from '@/lib/dominio/notificaciones'
 import { fetchMaterias, labelMateriaPorCodigo, type MateriaRegistrada } from '@/lib/dominio/materias'
 import { dialog } from '@/lib/nucleo/dialog'
+import {
+  alertaSinConexion,
+  confirmarReintento,
+  hayConexion,
+  mensajeErrorEnvio,
+  subirPdfCloudinary,
+} from '@/lib/nucleo/erroresOperacion'
 import { confirmarSolicitudEstudiante } from '@/lib/solicitudes/confirmarSolicitudEstudiante'
 import MateriaPicker from '@/componentes/controles/MateriaPicker.vue'
 import MateriaInfoPanel from '@/componentes/controles/MateriaInfoPanel.vue'
@@ -143,29 +150,20 @@ const enviando = ref(false)
 const enviar = async () => {
   const user = auth.currentUser
   if (!user || !formularioCompleto.value) return
+  if (!hayConexion()) {
+    await alertaSinConexion()
+    return
+  }
+
   enviando.value = true
 
   try {
     if (!archivo.value) {
       await dialog.alert('Debes adjuntar el formato R-GA003 firmado en PDF.', { variant: 'error' })
-      enviando.value = false
       return
     }
 
-    let pdfUrl = ''
-    const fd = new FormData()
-    fd.append('file', archivo.value)
-    fd.append('upload_preset', 'flexibilizaciones_pdf')
-    const res = await fetch('https://api.cloudinary.com/v1_1/dhbehhvb5/image/upload', {
-      method: 'POST', body: fd
-    })
-    const data = await res.json()
-    if (!data.secure_url) {
-      await dialog.alert('Error al subir el PDF', { variant: 'error' })
-      enviando.value = false
-      return
-    }
-    pdfUrl = data.secure_url
+    const pdfUrl = await subirPdfCloudinary(archivo.value)
 
     await addDoc(collection(db, 'supletorios'), {
       estudiante_id: user.uid,
@@ -184,12 +182,20 @@ const enviar = async () => {
       fecha_creacion: serverTimestamp(),
     })
 
-    await notificarDirectores({
-      titulo: 'Nueva solicitud de supletorio',
-      mensaje: `${nombreEstudiante.value} solicitó supletorio para ${cursoLabel.value}.`,
-      tipo: 'info',
-      ruta: '/director/solicitudes',
-    })
+    try {
+      await notificarDirectores({
+        titulo: 'Nueva solicitud de supletorio',
+        mensaje: `${nombreEstudiante.value} solicitó supletorio para ${cursoLabel.value}.`,
+        tipo: 'info',
+        ruta: '/director/solicitudes',
+      })
+    } catch (notifError) {
+      console.error('Supletorio guardado; falló notificación:', notifError)
+      await dialog.alert(
+        'Tu solicitud se guardó, pero no pudimos avisar al director de inmediato. Aparecerá en su bandeja al sincronizar.',
+        { variant: 'warning', title: 'Envío parcial' },
+      )
+    }
 
     await cargarSolicitudes(user.uid)
     emit('crear', { ...formData.value })
@@ -204,7 +210,11 @@ const enviar = async () => {
     await dialog.alert('Solicitud de supletorio enviada correctamente.', { variant: 'success', title: 'Listo' })
   } catch (error) {
     console.error('Error al enviar supletorio:', error)
-    await dialog.alert('Hubo un error al enviar la solicitud.', { variant: 'error', title: 'Error' })
+    const reintentar = await confirmarReintento(mensajeErrorEnvio(error))
+    if (reintentar) {
+      enviando.value = false
+      await enviar()
+    }
   } finally {
     enviando.value = false
   }

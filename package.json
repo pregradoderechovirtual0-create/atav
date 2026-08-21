@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "seed:director": "node scripts/seed-director.mjs",
     "deploy:portal": "npm run build && firebase deploy --only hosting:atavportal,firestore:rules",
-    "deploy:rules": "firebase deploy --only firestore:rules"
+    "deploy:rules": "firebase deploy --only firestore:rules",
+    "deploy:functions": "firebase deploy --only functions:cambiarPasswordUsuario"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
