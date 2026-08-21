@@ -5,7 +5,12 @@ import { db, auth } from '@/lib/firebase'
 import { doc, getDoc, updateDoc } from 'firebase/firestore'
 import { createUserWithEmailAndPassword } from 'firebase/auth'
 import { applyThemeForRole } from '@/lib/nucleo/theme'
-import { iniciarSesionConCedula, LoginError } from '@/lib/autenticacion/authLogin'
+import {
+  iniciarSesionConCedula,
+  LoginError,
+  activarCuentaConEmailYaEnAuth,
+  emailRegistradoEnAuth,
+} from '@/lib/autenticacion/authLogin'
 import { hashPassword } from '@/lib/autenticacion/passwordUtils'
 import { rutaInicioPorRol } from '@/lib/nucleo/rutas'
 import { sincronizarSesionLocal, consumirMotivoCierreSesion, mensajeMotivoCierreSesion } from '@/lib/autenticacion/session'
@@ -161,44 +166,49 @@ const registrar = async () => {
 
     const passwordHash = await hashPassword(regPassword.value)
     const email = `${cedulaLimpia}@atav.com`
+    const rol = (userData.rol || '').toString()
 
-    try {
-      await createUserWithEmailAndPassword(auth, email, regPassword.value)
+    const activarConAuthExistente =
+      userData.reactivacionPendiente === true ||
+      Boolean(userData.auth_uid) ||
+      (await emailRegistradoEnAuth(email))
 
-      await updateDoc(userRef, {
-        registrado: true,
-        requiereCambioPassword: false,
-        passwordTemporal: false,
-        reactivacionPendiente: false,
-        password_hash: passwordHash,
-        auth_uid: auth.currentUser?.uid || null,
-        authDesincronizado: false,
-      })
+    if (activarConAuthExistente) {
+      await activarCuentaConEmailYaEnAuth(cedulaLimpia, rol, passwordHash)
+      successMessage.value =
+        'Contraseña actualizada. Inicia sesión con tu cédula y la contraseña que acabas de crear.'
+    } else {
+      try {
+        await createUserWithEmailAndPassword(auth, email, regPassword.value)
 
-      await auth.signOut().catch(() => {})
-
-      successMessage.value = 'Cuenta activada. Inicia sesión con tu cédula y la contraseña que creaste.'
-    } catch (error: unknown) {
-      const err = error as { code?: string; message?: string }
-
-      if (err.code === 'auth/email-already-in-use') {
         await updateDoc(userRef, {
           registrado: true,
           requiereCambioPassword: false,
           passwordTemporal: false,
           reactivacionPendiente: false,
           password_hash: passwordHash,
-          authDesincronizado: true,
+          auth_uid: auth.currentUser?.uid || null,
+          authDesincronizado: false,
         })
 
-        successMessage.value =
-          'Contraseña actualizada. Inicia sesión con tu cédula y la contraseña que acabas de crear.'
-      } else if (err.code === 'auth/weak-password') {
-        errorMessage.value = 'Contraseña muy débil'
-        return
-      } else {
-        errorMessage.value = err.message || 'No se pudo completar la activación'
-        return
+        await auth.signOut().catch(() => {})
+
+        successMessage.value = 'Cuenta activada. Inicia sesión con tu cédula y la contraseña que creaste.'
+      } catch (error: unknown) {
+        const err = error as { code?: string; message?: string }
+
+        if (err.code === 'auth/email-already-in-use') {
+          await activarCuentaConEmailYaEnAuth(cedulaLimpia, rol, passwordHash)
+
+          successMessage.value =
+            'Contraseña actualizada. Inicia sesión con tu cédula y la contraseña que acabas de crear.'
+        } else if (err.code === 'auth/weak-password') {
+          errorMessage.value = 'Contraseña muy débil'
+          return
+        } else {
+          errorMessage.value = err.message || 'No se pudo completar la activación'
+          return
+        }
       }
     }
 
@@ -212,13 +222,17 @@ const registrar = async () => {
       showConfirm.value = false
     }, 1500)
   } catch (error: unknown) {
-    const err = error as { code?: string; message?: string }
-    if (err.code === 'auth/email-already-in-use') {
-      errorMessage.value = 'Este usuario ya fue registrado'
-    } else if (err.code === 'auth/weak-password') {
-      errorMessage.value = 'Contraseña muy débil'
+    if (error instanceof LoginError) {
+      errorMessage.value = error.message
     } else {
-      errorMessage.value = err.message || 'No se pudo completar el registro'
+      const err = error as { code?: string; message?: string }
+      if (err.code === 'auth/email-already-in-use') {
+        errorMessage.value = 'Este usuario ya fue registrado'
+      } else if (err.code === 'auth/weak-password') {
+        errorMessage.value = 'Contraseña muy débil'
+      } else {
+        errorMessage.value = err.message || 'No se pudo completar el registro'
+      }
     }
   } finally {
     isLoadingReg.value = false
@@ -309,7 +323,8 @@ const registrar = async () => {
               </div>
             </header>
 
-            <form class="form" @submit.prevent="login">
+            <form class="form form--login" @submit.prevent="login">
+              <div class="form-fields">
               <div class="form-group">
                 <label class="form-label">Cédula</label>
                 <div class="input-wrap">
@@ -394,10 +409,11 @@ const registrar = async () => {
                   ¿Olvidaste tu contraseña?
                 </button>
               </div>
+              </div>
 
-              <p v-if="errorMessage && modo === 'login'" class="msg-error">{{ errorMessage }}</p>
+              <p v-if="errorMessage && modo === 'login'" class="form-alert form-alert--error" role="alert">{{ errorMessage }}</p>
 
-              <button type="submit" class="btn-primary" :disabled="isLoadingLogin">
+              <button type="submit" class="btn-primary form-submit" :disabled="isLoadingLogin">
                 <span>{{ isLoadingLogin ? 'Ingresando...' : 'Ingresar' }}</span>
                 <svg v-if="!isLoadingLogin" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <line x1="5" y1="12" x2="19" y2="12"/>
@@ -430,7 +446,8 @@ const registrar = async () => {
               </div>
             </header>
 
-            <form class="form" @submit.prevent="registrar">
+            <form class="form form--registro" @submit.prevent="registrar">
+              <div class="form-fields">
               <div class="form-group">
                 <label class="form-label">Cédula</label>
                 <div class="input-wrap">
@@ -557,11 +574,12 @@ const registrar = async () => {
                   </button>
                 </div>
               </div>
+              </div>
 
-              <p v-if="errorMessage && modo === 'registro'" class="msg-error">{{ errorMessage }}</p>
-              <p v-if="successMessage" class="msg-success">{{ successMessage }}</p>
+              <p v-if="errorMessage && modo === 'registro'" class="form-alert form-alert--error" role="alert">{{ errorMessage }}</p>
+              <p v-if="successMessage" class="form-alert form-alert--success" role="status">{{ successMessage }}</p>
 
-              <button type="submit" class="btn-primary" :disabled="isLoadingReg">
+              <button type="submit" class="btn-primary form-submit" :disabled="isLoadingReg">
                 <span>{{ isLoadingReg ? 'Activando...' : 'Activar cuenta' }}</span>
                 <svg v-if="!isLoadingReg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <line x1="5" y1="12" x2="19" y2="12"/>
@@ -827,7 +845,7 @@ const registrar = async () => {
 .login-card-inner {
   position: relative;
   width: 100%;
-  height: 500px;
+  height: 520px;
   transition: transform 0.6s cubic-bezier(0.4, 0.2, 0.2, 1);
   transform-style: preserve-3d;
   transform-origin: center center;
@@ -959,6 +977,63 @@ const registrar = async () => {
   min-height: 0;
 }
 
+.form--registro,
+.form--login {
+  gap: 0;
+}
+
+.form-fields {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-bottom: 2px;
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+.form-fields::-webkit-scrollbar {
+  width: 5px;
+}
+
+.form-fields::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+.form-submit {
+  flex-shrink: 0;
+  margin-top: 10px;
+}
+
+.form--login .form-submit,
+.form--registro .form-submit {
+  margin-top: 10px;
+}
+
+.form-alert {
+  flex-shrink: 0;
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.form-alert--error {
+  background: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+}
+
+.form-alert--success {
+  background: #f0fdf4;
+  color: #166534;
+  border: 1px solid #bbf7d0;
+}
+
 .form-group {
   display: flex;
   flex-direction: column;
@@ -1080,21 +1155,17 @@ const registrar = async () => {
   text-underline-offset: 2px;
 }
 
-.msg-error {
-  font-size: 13px;
-  color: #dc2626;
-  margin: 0;
-}
-
+.msg-error,
 .msg-success {
   font-size: 13px;
-  color: #16a34a;
   margin: 0;
 }
 
 .btn-primary {
   height: 46px;
+  min-height: 46px;
   width: 100%;
+  flex-shrink: 0;
   border: none;
   border-radius: 10px;
   background: #0f172a;
@@ -1123,10 +1194,11 @@ const registrar = async () => {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-top: 2px;
+  margin-top: auto;
   padding-top: 14px;
   border-top: 1px solid #f1f5f9;
   flex-shrink: 0;
+  min-height: 44px;
 }
 
 .card-alt-text {
@@ -1339,20 +1411,38 @@ const registrar = async () => {
   .card-face {
     position: relative;
     height: auto;
+    min-height: 0;
     background: transparent;
     border: none;
     border-radius: 0;
     box-shadow: none;
     padding: 0;
     overflow: visible;
-    display: block;
+    display: flex;
+    flex-direction: column;
     backface-visibility: visible;
     -webkit-backface-visibility: visible;
     transform: none;
   }
 
+  .form {
+    flex: none;
+  }
+
+  .form-fields {
+    flex: none;
+    overflow: visible;
+    min-height: auto;
+  }
+
+  .card-alt-row {
+    margin-top: 16px;
+    border-top-color: #f1f5f9;
+    padding-top: 16px;
+  }
+
   .card-face--login {
-    display: block;
+    display: none;
   }
 
   .card-face--registro {
@@ -1360,12 +1450,12 @@ const registrar = async () => {
     transform: none;
   }
 
-  .login-card.is-flipped .card-face--login {
-    display: none;
+  .login-card:not(.is-flipped) .card-face--login {
+    display: flex;
   }
 
   .login-card.is-flipped .card-face--registro {
-    display: block;
+    display: flex;
   }
 
   .card-header {
@@ -1388,11 +1478,6 @@ const registrar = async () => {
     text-align: center;
     border-top: none;
   }
-
-  .card-alt-row {
-    border-top-color: #f1f5f9;
-    padding-top: 16px;
-  }
 }
 
 @media (max-width: 480px) {
@@ -1414,6 +1499,21 @@ const registrar = async () => {
 
   .card-title {
     font-size: 22px;
+  }
+
+  .form-row-meta {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .card-alt-row {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .form-alert {
+    font-size: 12px;
   }
 }
 </style>

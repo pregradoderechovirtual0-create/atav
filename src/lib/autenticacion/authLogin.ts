@@ -6,6 +6,7 @@ import {
   setPersistence,
   browserLocalPersistence,
   browserSessionPersistence,
+  fetchSignInMethodsForEmail,
 } from 'firebase/auth'
 import { auth, db } from '@/lib/firebase'
 import { hashPassword, verifyPassword } from '@/lib/autenticacion/passwordUtils'
@@ -84,6 +85,56 @@ function validarCuentaActivada(data: Record<string, unknown>) {
       'INVALID_CREDENTIALS',
     )
   }
+}
+
+/**
+ * Detecta si el correo ficticio de cédula ya está registrado en Firebase Auth
+ * (sin intentar signUp, evita 400 en consola).
+ */
+export async function emailRegistradoEnAuth(email: string): Promise<boolean> {
+  try {
+    const methods = await fetchSignInMethodsForEmail(auth, email)
+    return methods.length > 0
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Usuario ya existe en Firebase Auth: guarda hash en Firestore
+ * vía sesión anónima + auth_vinculos (sin contraseña antigua de Auth).
+ */
+export async function activarCuentaConEmailYaEnAuth(
+  cedula: string,
+  rol: string,
+  passwordHash: string,
+): Promise<void> {
+  await signOut(auth).catch(() => {})
+
+  try {
+    await signInAnonymously(auth)
+  } catch {
+    throw new LoginError(
+      'Activa el proveedor Anónimo en Firebase Authentication (Consola → Authentication → Sign-in method).',
+      'UNKNOWN',
+    )
+  }
+
+  const user = auth.currentUser
+  if (!user) {
+    throw new LoginError('No se pudo completar la activación', 'UNKNOWN')
+  }
+
+  await setDoc(doc(db, 'auth_vinculos', user.uid), { cedula, rol })
+  await updateDoc(doc(db, 'usuarios', cedula), {
+    registrado: true,
+    requiereCambioPassword: false,
+    passwordTemporal: false,
+    reactivacionPendiente: false,
+    password_hash: passwordHash,
+    authDesincronizado: true,
+  })
+  await signOut(auth).catch(() => {})
 }
 
 async function entrarConSesionAnonima(cedula: string, data: Record<string, unknown>) {

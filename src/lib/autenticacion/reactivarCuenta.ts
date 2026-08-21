@@ -36,6 +36,7 @@ export async function reactivarCuentaUsuario(cedula: string): Promise<void> {
     passwordTemporal: false,
     requiereCambioPassword: false,
     claveTemporal: deleteField(),
+    authDesincronizado: false,
     reactivacionPendiente: true,
   })
 }

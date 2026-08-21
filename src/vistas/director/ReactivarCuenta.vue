@@ -110,8 +110,21 @@ const confirmarReactivacion = async () => {
       </p>
 
       <div class="reactivar-actions">
-        <router-link to="/director/usuarios" class="btn btn-secondary">Cancelar</router-link>
-        <button type="button" class="btn btn-primary" :disabled="reactivando" @click="confirmarReactivacion">
+        <router-link to="/director/usuarios" class="reactivar-btn reactivar-btn--ghost">
+          Cancelar
+        </router-link>
+        <button
+          type="button"
+          class="reactivar-btn reactivar-btn--primary"
+          :disabled="reactivando"
+          @click="confirmarReactivacion"
+        >
+          <svg v-if="!reactivando" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0 3 3L22 7l-3-3m-3.5 3.5L19 4"/>
+          </svg>
+          <svg v-else class="reactivar-btn-spinner" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+          </svg>
           {{ reactivando ? 'Reactivando...' : 'Reactivar cuenta' }}
         </button>
       </div>
@@ -188,7 +201,78 @@ const confirmarReactivacion = async () => {
 
 .reactivar-actions {
   display: flex;
-  gap: 10px;
-  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--color-border-light, #e5e7eb);
+}
+
+.reactivar-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex: 1;
+  min-height: 44px;
+  padding: 0 18px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.2;
+  text-decoration: none;
+  border: none;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.1s ease;
+}
+
+.reactivar-btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.reactivar-btn--ghost {
+  background: var(--color-surface, #fff);
+  color: var(--color-text, #0f172a);
+  border: 1px solid var(--color-border, #e5e7eb);
+}
+
+.reactivar-btn--ghost:hover {
+  background: var(--color-subtle, #f8fafc);
+  border-color: var(--color-text-muted, #94a3b8);
+}
+
+.reactivar-btn--primary {
+  background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.18);
+}
+
+.reactivar-btn--primary:hover:not(:disabled) {
+  background: linear-gradient(180deg, #1e293b 0%, #334155 100%);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.22);
+}
+
+.reactivar-btn--primary:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.reactivar-btn-spinner {
+  animation: reactivar-spin 0.9s linear infinite;
+}
+
+@keyframes reactivar-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@media (max-width: 480px) {
+  .reactivar-actions {
+    flex-direction: column-reverse;
+  }
 }
 </style>

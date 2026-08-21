@@ -176,6 +176,17 @@ service cloud.firestore {
           && get(/databases/$(database)/documents/auth_vinculos/$(request.auth.uid)).data.cedula == userId
           && request.resource.data.diff(resource.data).affectedKeys()
             .hasOnly(['password_hash', 'requiereCambioPassword', 'authDesincronizado', 'auth_uid', 'passwordTemporal', 'claveTemporal', 'reactivacionPendiente'])
+        )
+        || (
+          isAuthenticated()
+          && request.auth.token.firebase.sign_in_provider == 'anonymous'
+          && resource.data.registrado == false
+          && request.resource.data.registrado == true
+          && get(/databases/$(database)/documents/auth_vinculos/$(request.auth.uid)).data.cedula == userId
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'registrado', 'requiereCambioPassword', 'passwordTemporal', 'reactivacionPendiente',
+            'password_hash', 'auth_uid', 'authDesincronizado',
+          ])
         );
 
       allow delete: if esDirector();
