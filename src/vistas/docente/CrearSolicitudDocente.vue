@@ -52,7 +52,7 @@ const minReprogramacion = computed(() =>
 )
 
 const maxReprogramacion = computed(() =>
-  formData.value.fechaFin ? sumarDiasIso(formData.value.fechaFin, 8) : undefined,
+  formData.value.fechaFin ? sumarDiasIso(formData.value.fechaFin, 14) : undefined,
 )
 
 const canGoNext = computed(() => {
