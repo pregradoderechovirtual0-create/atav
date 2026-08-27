@@ -327,7 +327,7 @@ const materiasPreview = computed(() => materiasAsignadas.value.slice(0, 5));
           >
         </div>
         <p class="stat-value">{{ stats.pendientes }}</p>
-        <p class="stat-label">Pendientesss</p>
+        <p class="stat-label">Pendientes</p>
       </div>
       <div class="stat-card stat-approved">
         <div class="stat-top">
