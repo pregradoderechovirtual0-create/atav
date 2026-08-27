@@ -1,4 +1,5 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const { onDocumentWritten } = require("firebase-functions/v2/firestore");
 const { initializeApp } = require("firebase-admin/app");
 const { getAuth } = require("firebase-admin/auth");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
@@ -79,7 +80,10 @@ exports.cambiarPasswordUsuario = onCall(async (request) => {
     );
   }
 
-  const userSnap = await getFirestore().collection("usuarios").doc(cedula).get();
+  const userSnap = await getFirestore()
+    .collection("usuarios")
+    .doc(cedula)
+    .get();
   if (!userSnap.exists) {
     throw new HttpsError("not-found", "Usuario no encontrado.");
   }
@@ -113,3 +117,95 @@ exports.cambiarPasswordUsuario = onCall(async (request) => {
 
   return { ok: true, uid };
 });
+
+async function notificarSuscritosAntesDeCambio(before, after, fuente) {
+  if (!after) return;
+  const materiaCodigo = String(
+    after.materia_codigo || after.curso || "",
+  ).trim();
+  if (!materiaCodigo) return;
+
+  const cambioRelevante =
+    !before ||
+    [
+      "estado",
+      "fecha_inicio",
+      "fecha_fin",
+      "fechas_reprogramacion",
+      "fecha",
+      "hora",
+      "descripcion",
+    ].some(
+      (campo) => JSON.stringify(before[campo]) !== JSON.stringify(after[campo]),
+    );
+  if (!cambioRelevante) return;
+
+  const suscripciones = await getFirestore()
+    .collection("suscripciones_materias")
+    .where("materia_codigo", "==", materiaCodigo)
+    .get();
+  if (suscripciones.empty) return;
+
+  const materia = String(
+    after.materia_label || after.materia || after.nombre || materiaCodigo,
+  );
+  const mensaje =
+    fuente === "solicitud"
+      ? `Hay una actualización docente para ${materia}. Revisa la nueva fecha, estado o detalle en ATAV.`
+      : `Se actualizó un evento de ${materia}. Consulta el calendario de ATAV para ver los detalles.`;
+
+  await Promise.all(
+    suscripciones.docs.map(async (suscripcion) => {
+      const data = suscripcion.data();
+      const notificacion = {
+        usuario_id: data.estudiante_id,
+        titulo: `Novedad en ${materiaCodigo}`,
+        mensaje,
+        tipo: "info",
+        leida: false,
+        ruta: "/estudiante/calendario",
+        fecha_creacion: FieldValue.serverTimestamp(),
+      };
+      await getFirestore().collection("notificaciones").add(notificacion);
+
+      const correo = String(data.correo_personal || "")
+        .trim()
+        .toLowerCase();
+      if (correo) {
+        await getFirestore()
+          .collection("mail")
+          .add({
+            to: correo,
+            message: {
+              subject: `Novedad en ${materia}`,
+              text: mensaje,
+            },
+            estudiante_id: data.estudiante_id,
+            creado_en: FieldValue.serverTimestamp(),
+          });
+      }
+    }),
+  );
+}
+
+exports.notificarSuscritosSolicitud = onDocumentWritten(
+  "solicitudes/{solicitudId}",
+  async (event) => {
+    await notificarSuscritosAntesDeCambio(
+      event.data?.before.exists ? event.data.before.data() : null,
+      event.data?.after.exists ? event.data.after.data() : null,
+      "solicitud",
+    );
+  },
+);
+
+exports.notificarSuscritosEvento = onDocumentWritten(
+  "eventos/{eventoId}",
+  async (event) => {
+    await notificarSuscritosAntesDeCambio(
+      event.data?.before.exists ? event.data.before.data() : null,
+      event.data?.after.exists ? event.data.after.data() : null,
+      "evento",
+    );
+  },
+);

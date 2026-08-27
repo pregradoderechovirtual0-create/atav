@@ -276,6 +276,17 @@ service cloud.firestore {
       allow write: if esDirector();
     }
 
+    match /suscripciones_materias/{docId} {
+      allow read, delete: if isAuthenticated() && resource.data.estudiante_id == request.auth.uid;
+      allow create: if esEstudiante()
+        && request.resource.data.estudiante_id == request.auth.uid
+        && request.resource.data.materia_codigo is string
+        && request.resource.data.materia_codigo.size() > 0
+        && request.resource.data.correo_personal is string
+        && request.resource.data.correo_personal.size() > 0;
+      allow update: if false;
+    }
+
     match /parciales/{docId} {
       allow read: if isAuthenticated();
       allow write: if esDirector();
