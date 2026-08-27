@@ -341,7 +341,7 @@ const enviar = async () => {
       <div v-if="currentStep === 3" class="step-content">
         <div class="step-header">
           <h2>Propuesta de reprogramacion</h2>
-          <p>Indica como planeas reponer las clases</p>
+          <p>Indica como planeas reponer los encuentros</p>
         </div>
         <div class="repro-section">
           <label class="form-label">Tipo de reprogramacion</label>
@@ -365,7 +365,7 @@ const enviar = async () => {
 
         <div class="repro-section">
           <label class="form-label">Fechas propuestas (hasta 3 opciones)</label>
-          <p class="form-hint">Maximo 8 dias despues de la ausencia</p>
+          <p class="form-hint">Maximo 14 dias despues de la ausencia</p>
           <div class="dates-grid">
             <div v-for="(_, index) in formData.fechasReprogramacion" :key="index" class="form-group date-picker-group">
               <span class="date-label">Opcion {{ index + 1 }} {{ index === 0 ? '*' : '(opcional)' }}</span>
