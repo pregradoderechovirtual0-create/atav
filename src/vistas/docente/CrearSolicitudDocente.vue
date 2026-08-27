@@ -341,7 +341,7 @@ const enviar = async () => {
       <div v-if="currentStep === 3" class="step-content">
         <div class="step-header">
           <h2>Propuesta de reprogramacion</h2>
-          <p>Indica como planeas reponer los encuentros</p>
+          <p>Indica como planeas reponer los encuentros no clases</p>
         </div>
         <div class="repro-section">
           <label class="form-label">Tipo de reprogramacion</label>
