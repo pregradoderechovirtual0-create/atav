@@ -60,6 +60,13 @@ const cargar = async () => {
 
   try {
     suscripciones.value = await cargarSuscripcionesMateria(user.uid);
+    const correoDeSuscripcion = suscripciones.value
+      .find((suscripcion) => suscripcion.correo_personal?.trim())
+      ?.correo_personal?.trim();
+    if (!correoGuardado.value && correoDeSuscripcion) {
+      correoPersonal.value = correoDeSuscripcion;
+      correoGuardado.value = true;
+    }
   } catch (error) {
     console.warn("No se pudieron cargar las suscripciones existentes:", error);
   }
@@ -70,13 +77,17 @@ const alternar = async (materia: MateriaRegistrada) => {
   mensaje.value = "";
   const user = auth.currentUser;
   if (!user) return;
-  if (!suscrita(materia.codigo) && !tieneCorreo.value) {
+  const primeraSuscripcion =
+    !correoGuardado.value && suscripciones.value.length === 0;
+  if (!suscrita(materia.codigo) && primeraSuscripcion && !tieneCorreo.value) {
     error.value =
       "Ingresa y confirma tu correo personal para recibir avisos de tus materias.";
     return;
   }
   if (
     !suscrita(materia.codigo) &&
+    primeraSuscripcion &&
+    tieneCorreo.value &&
     correoPersonal.value.trim().toLowerCase() !==
       correoConfirmacion.value.trim().toLowerCase()
   ) {
