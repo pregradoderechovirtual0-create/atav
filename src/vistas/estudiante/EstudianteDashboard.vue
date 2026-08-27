@@ -1,10 +1,14 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
-import { collection, query, where, getDocs } from 'firebase/firestore'
-import { auth, db } from '@/lib/firebase'
-import { onAuthStateChanged } from 'firebase/auth'
-import { obtenerSesion, esperarAuth, leerNombreLocal } from '@/lib/autenticacion/session'
-import { precargarCachesSolicitudesEstudiante } from '@/lib/solicitudes/precargarSolicitudesEstudiante'
+import { ref, computed, onMounted } from "vue";
+import { collection, query, where, getDocs } from "firebase/firestore";
+import { auth, db } from "@/lib/firebase";
+import { onAuthStateChanged } from "firebase/auth";
+import {
+  obtenerSesion,
+  esperarAuth,
+  leerNombreLocal,
+} from "@/lib/autenticacion/session";
+import { precargarCachesSolicitudesEstudiante } from "@/lib/solicitudes/precargarSolicitudesEstudiante";
 import {
   type DashboardSolicitud,
   desdeFlexDoc,
@@ -16,199 +20,285 @@ import {
   construirDashboardDesdeCachesSidebar,
   leerCacheParcialesProximos,
   guardarCacheParcialesProximos,
-} from '@/lib/solicitudes/dashboardSolicitudes'
-import { primerosDosNombres } from '@/lib/nucleo/nombreCorto'
-import { useRefreshOnVisible } from '@/composables/useRefreshOnVisible'
+} from "@/lib/solicitudes/dashboardSolicitudes";
+import { primerosDosNombres } from "@/lib/nucleo/nombreCorto";
+import { useRefreshOnVisible } from "@/composables/useRefreshOnVisible";
+import { fetchMaterias, type MateriaRegistrada } from "@/lib/dominio/materias";
 
-const nombreEstudiante = ref(leerNombreLocal())
+const nombreEstudiante = ref(leerNombreLocal());
 
-const nombreSaludo = computed(() => primerosDosNombres(nombreEstudiante.value))
-const solicitudes = ref<DashboardSolicitud[]>([])
-const proximosParciales = ref<any[]>(leerCacheParcialesProximos() ?? [])
-const cargando = ref(solicitudes.value.length === 0)
+const nombreSaludo = computed(() => primerosDosNombres(nombreEstudiante.value));
+const solicitudes = ref<DashboardSolicitud[]>([]);
+const proximosParciales = ref<any[]>(leerCacheParcialesProximos() ?? []);
+const cargando = ref(solicitudes.value.length === 0);
+const materiasOfertadas = ref<MateriaRegistrada[]>([]);
+const cargandoMaterias = ref(true);
 
 const accionesRapidas = [
   {
-    title: 'Flexibilización',
-    desc: 'Cambio de fecha u hora de parcial',
-    path: '/estudiante/flexibilidad',
-    icon: 'calendar',
-    color: '#10b981',
-    bg: '#ecfdf5',
+    title: "Inscribirme a materias",
+    desc: "Selecciona tus clases del semestre actual",
+    path: "/estudiante/materias",
+    icon: "book",
+    color: "#0f766e",
+    bg: "#f0fdfa",
   },
   {
-    title: 'Habilitación',
-    desc: 'Habilitar una materia',
-    path: '/estudiante/habilitaciones',
-    icon: 'book',
-    color: '#3b82f6',
-    bg: '#eff6ff',
+    title: "Flexibilización",
+    desc: "Cambio de fecha u hora de parcial",
+    path: "/estudiante/flexibilidad",
+    icon: "calendar",
+    color: "#10b981",
+    bg: "#ecfdf5",
   },
   {
-    title: 'Supletorio',
-    desc: 'Examen supletorio',
-    path: '/estudiante/supletorios',
-    icon: 'file',
-    color: '#f59e0b',
-    bg: '#fffbeb',
+    title: "Habilitación",
+    desc: "Habilitar una materia",
+    path: "/estudiante/habilitaciones",
+    icon: "book",
+    color: "#3b82f6",
+    bg: "#eff6ff",
   },
-]
+  {
+    title: "Supletorio",
+    desc: "Examen supletorio",
+    path: "/estudiante/supletorios",
+    icon: "file",
+    color: "#f59e0b",
+    bg: "#fffbeb",
+  },
+];
 
 const horaDelDia = computed(() => {
-  const h = new Date().getHours()
-  if (h < 12) return 'Buenos días'
-  if (h < 18) return 'Buenas tardes'
-  return 'Buenas noches'
-})
+  const h = new Date().getHours();
+  if (h < 12) return "Buenos días";
+  if (h < 18) return "Buenas tardes";
+  return "Buenas noches";
+});
 
 const fechaHoy = computed(() =>
-  new Date().toLocaleDateString('es-CO', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
-)
+  new Date().toLocaleDateString("es-CO", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  }),
+);
 
 const formatFecha = (iso: string) => {
-  if (!iso) return '—'
-  const [y, m, d] = iso.split('-')
-  const meses = ['', 'ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
-  return `${parseInt(d)} ${meses[parseInt(m)]} ${y}`
-}
+  if (!iso) return "—";
+  const [y, m, d] = iso.split("-");
+  const meses = [
+    "",
+    "ene",
+    "feb",
+    "mar",
+    "abr",
+    "may",
+    "jun",
+    "jul",
+    "ago",
+    "sep",
+    "oct",
+    "nov",
+    "dic",
+  ];
+  return `${parseInt(d)} ${meses[parseInt(m)]} ${y}`;
+};
 
-const cargarFlexibilizaciones = async (uid: string): Promise<DashboardSolicitud[]> => {
-  const q = query(collection(db, 'flexibilizaciones'), where('estudiante_id', '==', uid))
-  const snap = await getDocs(q)
-  return snap.docs.map(doc => desdeFlexDoc(doc.id, doc.data()))
-}
+const cargarFlexibilizaciones = async (
+  uid: string,
+): Promise<DashboardSolicitud[]> => {
+  const q = query(
+    collection(db, "flexibilizaciones"),
+    where("estudiante_id", "==", uid),
+  );
+  const snap = await getDocs(q);
+  return snap.docs.map((doc) => desdeFlexDoc(doc.id, doc.data()));
+};
 
-const cargarHabilitaciones = async (uid: string): Promise<DashboardSolicitud[]> => {
-  const q = query(collection(db, 'habilitaciones'), where('estudiante_id', '==', uid))
-  const snap = await getDocs(q)
-  return snap.docs.map(doc => desdeHabDoc(doc.id, doc.data()))
-}
+const cargarHabilitaciones = async (
+  uid: string,
+): Promise<DashboardSolicitud[]> => {
+  const q = query(
+    collection(db, "habilitaciones"),
+    where("estudiante_id", "==", uid),
+  );
+  const snap = await getDocs(q);
+  return snap.docs.map((doc) => desdeHabDoc(doc.id, doc.data()));
+};
 
-const cargarSupletorios = async (uid: string): Promise<DashboardSolicitud[]> => {
-  const q = query(collection(db, 'supletorios'), where('estudiante_id', '==', uid))
-  const snap = await getDocs(q)
-  return snap.docs.map(doc => desdeSupDoc(doc.id, doc.data()))
-}
+const cargarSupletorios = async (
+  uid: string,
+): Promise<DashboardSolicitud[]> => {
+  const q = query(
+    collection(db, "supletorios"),
+    where("estudiante_id", "==", uid),
+  );
+  const snap = await getDocs(q);
+  return snap.docs.map((doc) => desdeSupDoc(doc.id, doc.data()));
+};
 
 const cargarParciales = async () => {
   try {
-    const parSnap = await getDocs(collection(db, 'parciales'))
-    const hoy = new Date()
+    const parSnap = await getDocs(collection(db, "parciales"));
+    const hoy = new Date();
     proximosParciales.value = parSnap.docs
-      .map(d => ({ id: d.id, ...d.data() }))
-      .filter((p: any) => new Date(p.fecha + 'T00:00:00') >= hoy)
+      .map((d) => ({ id: d.id, ...d.data() }))
+      .filter((p: any) => new Date(p.fecha + "T00:00:00") >= hoy)
       .sort((a: any, b: any) => a.fecha.localeCompare(b.fecha))
-      .slice(0, 4) as any[]
-    guardarCacheParcialesProximos(proximosParciales.value)
+      .slice(0, 4) as any[];
+    guardarCacheParcialesProximos(proximosParciales.value);
   } catch (_) {
-    proximosParciales.value = []
+    proximosParciales.value = [];
   }
-}
+};
+
+const cargarMateriasOfertadas = async () => {
+  try {
+    const materias = await fetchMaterias();
+    materiasOfertadas.value = materias.filter((materia) =>
+      materia.profesor?.trim(),
+    );
+  } catch (error) {
+    console.error("Error cargando materias ofertadas:", error);
+    materiasOfertadas.value = [];
+  } finally {
+    cargandoMaterias.value = false;
+  }
+};
 
 const aplicarCacheDashboard = (uid: string) => {
-  const cached = leerCacheDashboardSolicitudes(uid)
-    ?? construirDashboardDesdeCachesSidebar(uid)
+  const cached =
+    leerCacheDashboardSolicitudes(uid) ??
+    construirDashboardDesdeCachesSidebar(uid);
   if (cached) {
-    solicitudes.value = cached
-    cargando.value = false
+    solicitudes.value = cached;
+    cargando.value = false;
   }
-}
+};
 
 const cargarSolicitudes = async (uid: string) => {
-  const sinDatos = solicitudes.value.length === 0
-  if (sinDatos) cargando.value = true
+  const sinDatos = solicitudes.value.length === 0;
+  if (sinDatos) cargando.value = true;
   try {
     const [flex, hab, sup] = await Promise.all([
       cargarFlexibilizaciones(uid),
       cargarHabilitaciones(uid),
       cargarSupletorios(uid),
       cargarParciales(),
-    ])
-    solicitudes.value = mergeDashboardSolicitudes([...flex, ...hab, ...sup])
-    guardarCacheDashboardSolicitudes(uid, solicitudes.value)
+    ]);
+    solicitudes.value = mergeDashboardSolicitudes([...flex, ...hab, ...sup]);
+    guardarCacheDashboardSolicitudes(uid, solicitudes.value);
   } catch (error) {
-    console.error('Error cargando solicitudes:', error)
+    console.error("Error cargando solicitudes:", error);
   } finally {
-    cargando.value = false
+    cargando.value = false;
   }
-}
+};
 
 onMounted(async () => {
-  if (!nombreEstudiante.value) nombreEstudiante.value = leerNombreLocal()
+  if (!nombreEstudiante.value) nombreEstudiante.value = leerNombreLocal();
 
-  await esperarAuth()
-  const uid = auth.currentUser?.uid
+  await esperarAuth();
+  const uid = auth.currentUser?.uid;
   if (uid) {
-    aplicarCacheDashboard(uid)
-    precargarCachesSolicitudesEstudiante(uid)
+    cargarMateriasOfertadas();
+    aplicarCacheDashboard(uid);
+    precargarCachesSolicitudesEstudiante(uid);
   }
 
-  const sesion = await obtenerSesion()
-  if (sesion?.nombre?.trim()) nombreEstudiante.value = sesion.nombre.trim()
+  const sesion = await obtenerSesion();
+  if (sesion?.nombre?.trim()) nombreEstudiante.value = sesion.nombre.trim();
 
   onAuthStateChanged(auth, (user) => {
     if (user) {
-      aplicarCacheDashboard(user.uid)
-      precargarCachesSolicitudesEstudiante(user.uid)
-      cargarSolicitudes(user.uid)
-    } else cargando.value = false
-  })
-})
+      aplicarCacheDashboard(user.uid);
+      precargarCachesSolicitudesEstudiante(user.uid);
+      cargarSolicitudes(user.uid);
+    } else cargando.value = false;
+  });
+});
 
 const refrescarSiHaySesion = () => {
-  const uid = auth.currentUser?.uid
-  if (uid) cargarSolicitudes(uid)
-}
+  const uid = auth.currentUser?.uid;
+  if (uid) cargarSolicitudes(uid);
+};
 
-useRefreshOnVisible(refrescarSiHaySesion)
+useRefreshOnVisible(refrescarSiHaySesion);
 
 const stats = computed(() => ({
   total: solicitudes.value.length,
-  pendientes: solicitudes.value.filter(s => s.estado === 'Pendiente' || s.estado === 'En revisión').length,
-  aprobadas: solicitudes.value.filter(s => s.estado === 'Aprobada').length,
-  rechazadas: solicitudes.value.filter(s => s.estado === 'Rechazada').length,
-}))
+  pendientes: solicitudes.value.filter(
+    (s) => s.estado === "Pendiente" || s.estado === "En revisión",
+  ).length,
+  aprobadas: solicitudes.value.filter((s) => s.estado === "Aprobada").length,
+  rechazadas: solicitudes.value.filter((s) => s.estado === "Rechazada").length,
+}));
 
-const solicitudesRecientes = computed(() => solicitudes.value.slice(0, 6))
+const solicitudesRecientes = computed(() => solicitudes.value.slice(0, 6));
 
 const tipoIconClass = (tipo: string) => {
-  if (tipo === 'flexibilizacion') return 'tipo-flex'
-  if (tipo === 'habilitacion') return 'tipo-hab'
-  return 'tipo-sup'
-}
+  if (tipo === "flexibilizacion") return "tipo-flex";
+  if (tipo === "habilitacion") return "tipo-hab";
+  return "tipo-sup";
+};
 
 const tipoColorParcial: Record<string, string> = {
-  habilitacion: '#3b82f6',
-  supletorio: '#f59e0b',
-  flexibilizacion: '#10b981',
-}
+  habilitacion: "#3b82f6",
+  supletorio: "#f59e0b",
+  flexibilizacion: "#10b981",
+};
 </script>
 
 <template>
   <div class="estudiante-dashboard">
-
     <section class="hero-welcome">
       <div class="hero-content">
         <p class="fecha-hoy">{{ fechaHoy }}</p>
-        <h1 class="saludo">{{ horaDelDia }}<template v-if="nombreSaludo">, {{ nombreSaludo }}</template></h1>
-        <p class="hero-subtitle">Tu espacio para trámites y seguimiento académico</p>
+        <h1 class="saludo">
+          {{ horaDelDia
+          }}<template v-if="nombreSaludo">, {{ nombreSaludo }}</template>
+        </h1>
+        <p class="hero-subtitle">
+          Tu espacio para trámites y seguimiento académico
+        </p>
 
         <router-link to="/estudiante/flexibilidad" class="btn-hero-cta">
           <span class="btn-hero-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
-              <line x1="16" y1="2" x2="16" y2="6"/>
-              <line x1="8" y1="2" x2="8" y2="6"/>
-              <line x1="3" y1="10" x2="21" y2="10"/>
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+              <line x1="16" y1="2" x2="16" y2="6" />
+              <line x1="8" y1="2" x2="8" y2="6" />
+              <line x1="3" y1="10" x2="21" y2="10" />
             </svg>
           </span>
           <span class="btn-hero-text">
             <span class="btn-hero-label">Solicitar flexibilización</span>
-            <span class="btn-hero-hint">Cambia la fecha u hora de un parcial</span>
+            <span class="btn-hero-hint"
+              >Cambia la fecha u hora de un parcial</span
+            >
           </span>
-          <span v-if="stats.pendientes > 0" class="btn-hero-badge">{{ stats.pendientes }} en proceso</span>
-          <svg class="btn-hero-arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="9 18 15 12 9 6"/>
+          <span v-if="stats.pendientes > 0" class="btn-hero-badge"
+            >{{ stats.pendientes }} en proceso</span
+          >
+          <svg
+            class="btn-hero-arrow"
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <polyline points="9 18 15 12 9 6" />
           </svg>
         </router-link>
       </div>
@@ -221,39 +311,136 @@ const tipoColorParcial: Record<string, string> = {
         :to="accion.path"
         class="accion-card"
       >
-        <div class="accion-icon" :style="{ background: accion.bg, color: accion.color }">
-          <svg v-if="accion.icon === 'calendar'" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
-            <line x1="16" y1="2" x2="16" y2="6"/>
-            <line x1="8" y1="2" x2="8" y2="6"/>
-            <line x1="3" y1="10" x2="21" y2="10"/>
+        <div
+          class="accion-icon"
+          :style="{ background: accion.bg, color: accion.color }"
+        >
+          <svg
+            v-if="accion.icon === 'calendar'"
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+            <line x1="16" y1="2" x2="16" y2="6" />
+            <line x1="8" y1="2" x2="8" y2="6" />
+            <line x1="3" y1="10" x2="21" y2="10" />
           </svg>
-          <svg v-else-if="accion.icon === 'book'" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
-            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+          <svg
+            v-else-if="accion.icon === 'book'"
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+            <path
+              d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"
+            />
           </svg>
-          <svg v-else width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-            <polyline points="14 2 14 8 20 8"/>
+          <svg
+            v-else
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <path
+              d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
+            />
+            <polyline points="14 2 14 8 20 8" />
           </svg>
         </div>
         <div class="accion-text">
           <span class="accion-title">{{ accion.title }}</span>
           <span class="accion-desc">{{ accion.desc }}</span>
         </div>
-        <svg class="accion-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <polyline points="9 18 15 12 9 6"/>
+        <svg
+          class="accion-arrow"
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <polyline points="9 18 15 12 9 6" />
         </svg>
       </router-link>
+    </section>
+
+    <section class="card materias-ofertadas">
+      <div class="card-header">
+        <div>
+          <h2>Materias ofertadas</h2>
+          <p class="materias-ofertadas-subtitle">
+            Clases disponibles con profesor asignado para este semestre
+          </p>
+        </div>
+        <router-link to="/estudiante/materias" class="ver-link">
+          Ver inscripción →
+        </router-link>
+      </div>
+
+      <div v-if="cargandoMaterias" class="materias-ofertadas-state">
+        Cargando materias ofertadas...
+      </div>
+      <div v-else-if="materiasOfertadas.length" class="materias-ofertadas-list">
+        <div
+          v-for="materia in materiasOfertadas"
+          :key="materia.id"
+          class="materia-ofertada-row"
+        >
+          <div class="materia-ofertada-info">
+            <strong>{{ materia.codigo }} — {{ materia.nombre }}</strong>
+            <span>
+              Profesor: {{ materia.profesor }} ·
+              {{
+                materia.semestre
+                  ? `Semestre ${materia.semestre}`
+                  : "Semestre no indicado"
+              }}
+            </span>
+          </div>
+          <router-link
+            to="/estudiante/materias"
+            class="materia-ofertada-action"
+          >
+            Suscribirme
+          </router-link>
+        </div>
+      </div>
+      <div v-else class="materias-ofertadas-state">
+        Aún no hay materias ofertadas con profesor asignado.
+        <router-link to="/director/materias" class="ver-link">
+          Publicar materias
+        </router-link>
+      </div>
     </section>
 
     <section class="stats-grid">
       <div class="stat-card">
         <div class="stat-top">
-          <div class="stat-icon" style="background:#eff6ff; color:#3b82f6">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-              <polyline points="14 2 14 8 20 8"/>
+          <div class="stat-icon" style="background: #eff6ff; color: #3b82f6">
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path
+                d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
+              />
+              <polyline points="14 2 14 8 20 8" />
             </svg>
           </div>
         </div>
@@ -262,22 +449,38 @@ const tipoColorParcial: Record<string, string> = {
       </div>
       <div class="stat-card stat-pending">
         <div class="stat-top">
-          <div class="stat-icon" style="background:#fffbeb; color:#f59e0b">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="12" cy="12" r="10"/>
-              <polyline points="12 6 12 12 16 14"/>
+          <div class="stat-icon" style="background: #fffbeb; color: #f59e0b">
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <circle cx="12" cy="12" r="10" />
+              <polyline points="12 6 12 12 16 14" />
             </svg>
           </div>
-          <span v-if="stats.pendientes > 0" class="stat-tag stat-tag-warn">En proceso</span>
+          <span v-if="stats.pendientes > 0" class="stat-tag stat-tag-warn"
+            >En proceso</span
+          >
         </div>
         <p class="stat-value">{{ stats.pendientes }}</p>
         <p class="stat-label">Pendientes</p>
       </div>
       <div class="stat-card stat-approved">
         <div class="stat-top">
-          <div class="stat-icon" style="background:#ecfdf5; color:#10b981">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polyline points="20 6 9 17 4 12"/>
+          <div class="stat-icon" style="background: #ecfdf5; color: #10b981">
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <polyline points="20 6 9 17 4 12" />
             </svg>
           </div>
         </div>
@@ -286,9 +489,17 @@ const tipoColorParcial: Record<string, string> = {
       </div>
       <div class="stat-card stat-rejected">
         <div class="stat-top">
-          <div class="stat-icon" style="background:#fef2f2; color:#ef4444">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          <div class="stat-icon" style="background: #fef2f2; color: #ef4444">
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
             </svg>
           </div>
         </div>
@@ -299,14 +510,24 @@ const tipoColorParcial: Record<string, string> = {
 
     <div class="info-bar">
       <div class="info-icon">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="10"/>
-          <line x1="12" y1="16" x2="12" y2="12"/>
-          <line x1="12" y1="8" x2="12.01" y2="8"/>
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <circle cx="12" cy="12" r="10" />
+          <line x1="12" y1="16" x2="12" y2="12" />
+          <line x1="12" y1="8" x2="12.01" y2="8" />
         </svg>
       </div>
       <span class="info-texto">
-        Las <strong>flexibilizaciones</strong> se gestionan en la facultad. Las <strong>habilitaciones</strong> y <strong>supletorios</strong> quedan registrados para trazabilidad; la decisión final la toma Secretaría General.
+        Las <strong>flexibilizaciones</strong> se gestionan en la facultad. Las
+        <strong>habilitaciones</strong> y <strong>supletorios</strong> quedan
+        registrados para trazabilidad; la decisión final la toma Secretaría
+        General.
       </span>
     </div>
 
@@ -314,22 +535,35 @@ const tipoColorParcial: Record<string, string> = {
       <div class="card card-main" id="mis-solicitudes">
         <div class="card-header">
           <h2>Mis solicitudes</h2>
-          <span v-if="solicitudes.length" class="header-count">{{ solicitudes.length }}</span>
+          <span v-if="solicitudes.length" class="header-count">{{
+            solicitudes.length
+          }}</span>
         </div>
 
         <div v-if="cargando" class="loading-state">
-          <div class="skeleton" v-for="i in 4" :key="i"/>
+          <div class="skeleton" v-for="i in 4" :key="i" />
         </div>
 
         <div v-else-if="solicitudes.length === 0" class="empty-state">
           <div class="empty-icon">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-              <polyline points="14 2 14 8 20 8"/>
+            <svg
+              width="28"
+              height="28"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.5"
+            >
+              <path
+                d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
+              />
+              <polyline points="14 2 14 8 20 8" />
             </svg>
           </div>
           <p class="empty-title">Aún no tienes solicitudes</p>
-          <p class="empty-desc">Usa las opciones de arriba para iniciar un trámite.</p>
+          <p class="empty-desc">
+            Usa las opciones de arriba para iniciar un trámite.
+          </p>
         </div>
 
         <div v-else class="solicitudes-lista">
@@ -340,23 +574,59 @@ const tipoColorParcial: Record<string, string> = {
             class="solicitud-row"
           >
             <div :class="['sol-tipo-icon', tipoIconClass(sol.tipo)]">
-              <svg v-if="sol.tipo === 'flexibilizacion'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="3" y="4" width="18" height="18" rx="2"/>
-                <line x1="3" y1="10" x2="21" y2="10"/>
+              <svg
+                v-if="sol.tipo === 'flexibilizacion'"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <rect x="3" y="4" width="18" height="18" rx="2" />
+                <line x1="3" y1="10" x2="21" y2="10" />
               </svg>
-              <svg v-else-if="sol.tipo === 'habilitacion'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
-                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+              <svg
+                v-else-if="sol.tipo === 'habilitacion'"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+                <path
+                  d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"
+                />
               </svg>
-              <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                <polyline points="14 2 14 8 20 8"/>
+              <svg
+                v-else
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path
+                  d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
+                />
+                <polyline points="14 2 14 8 20 8" />
               </svg>
             </div>
             <div class="sol-info">
               <p class="sol-nombre">{{ sol.curso }}</p>
-              <p class="sol-meta">{{ sol.tipoLabel }} · {{ formatFecha(sol.fecha) }}<template v-if="sol.detalle"> · {{ sol.detalle }}</template></p>
-              <p v-if="sol.motivoRechazo && sol.estado === 'Rechazada'" class="sol-rechazo">{{ sol.motivoRechazo }}</p>
+              <p class="sol-meta">
+                {{ sol.tipoLabel }} · {{ formatFecha(sol.fecha)
+                }}<template v-if="sol.detalle"> · {{ sol.detalle }}</template>
+              </p>
+              <p
+                v-if="sol.motivoRechazo && sol.estado === 'Rechazada'"
+                class="sol-rechazo"
+              >
+                {{ sol.motivoRechazo }}
+              </p>
             </div>
             <span :class="['badge', sol.estadoClass]">{{ sol.estado }}</span>
           </router-link>
@@ -365,9 +635,15 @@ const tipoColorParcial: Record<string, string> = {
         <div v-if="solicitudes.length > 6" class="card-footer">
           <span>Mostrando 6 de {{ solicitudes.length }} solicitudes</span>
           <div class="footer-links">
-            <router-link to="/estudiante/flexibilidad" class="ver-link">Flexibilización</router-link>
-            <router-link to="/estudiante/habilitaciones" class="ver-link">Habilitación</router-link>
-            <router-link to="/estudiante/supletorios" class="ver-link">Supletorio</router-link>
+            <router-link to="/estudiante/flexibilidad" class="ver-link"
+              >Flexibilización</router-link
+            >
+            <router-link to="/estudiante/habilitaciones" class="ver-link"
+              >Habilitación</router-link
+            >
+            <router-link to="/estudiante/supletorios" class="ver-link"
+              >Supletorio</router-link
+            >
           </div>
         </div>
       </div>
@@ -376,19 +652,29 @@ const tipoColorParcial: Record<string, string> = {
         <div class="card">
           <div class="card-header">
             <h2>Próximos parciales</h2>
-            <router-link to="/estudiante/calendario" class="ver-link">Calendario →</router-link>
+            <router-link to="/estudiante/calendario" class="ver-link"
+              >Calendario →</router-link
+            >
           </div>
 
-          <div v-if="proximosParciales.length === 0" class="empty-state pequeño">
+          <div
+            v-if="proximosParciales.length === 0"
+            class="empty-state pequeño"
+          >
             <p>Sin parciales próximos programados</p>
           </div>
 
           <div v-else class="parciales-lista">
             <div v-for="p in proximosParciales" :key="p.id" class="parcial-row">
-              <div class="parcial-dot" :style="{ background: tipoColorParcial[p.tipo] || '#94a3b8' }"/>
+              <div
+                class="parcial-dot"
+                :style="{ background: tipoColorParcial[p.tipo] || '#94a3b8' }"
+              />
               <div class="parcial-info">
                 <p class="parcial-materia">{{ p.materia }}</p>
-                <p class="parcial-meta">{{ p.fecha }} · {{ p.hora }} · {{ p.aula }}</p>
+                <p class="parcial-meta">
+                  {{ p.fecha }} · {{ p.hora }} · {{ p.aula }}
+                </p>
               </div>
             </div>
           </div>
@@ -399,55 +685,103 @@ const tipoColorParcial: Record<string, string> = {
           <div class="accesos-grid">
             <router-link to="/estudiante/calendario" class="acceso">
               <div class="acceso-icon">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <rect x="3" y="4" width="18" height="18" rx="2"/>
-                  <line x1="16" y1="2" x2="16" y2="6"/>
-                  <line x1="8" y1="2" x2="8" y2="6"/>
-                  <line x1="3" y1="10" x2="21" y2="10"/>
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <rect x="3" y="4" width="18" height="18" rx="2" />
+                  <line x1="16" y1="2" x2="16" y2="6" />
+                  <line x1="8" y1="2" x2="8" y2="6" />
+                  <line x1="3" y1="10" x2="21" y2="10" />
                 </svg>
               </div>
               <span>Calendario</span>
             </router-link>
             <router-link to="/estudiante/recursos" class="acceso">
               <div class="acceso-icon">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path
+                    d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"
+                  />
                 </svg>
               </div>
               <span>Recursos</span>
             </router-link>
             <router-link to="/estudiante/habilitaciones" class="acceso">
               <div class="acceso-icon">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
-                  <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+                  <path
+                    d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"
+                  />
                 </svg>
               </div>
               <span>Habilitación</span>
             </router-link>
             <router-link to="/estudiante/supletorios" class="acceso">
               <div class="acceso-icon">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                  <polyline points="14 2 14 8 20 8"/>
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path
+                    d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
+                  />
+                  <polyline points="14 2 14 8 20 8" />
                 </svg>
               </div>
               <span>Supletorio</span>
             </router-link>
             <router-link to="/estudiante/flexibilidad" class="acceso">
               <div class="acceso-icon">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <rect x="3" y="4" width="18" height="18" rx="2"/>
-                  <line x1="3" y1="10" x2="21" y2="10"/>
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <rect x="3" y="4" width="18" height="18" rx="2" />
+                  <line x1="3" y1="10" x2="21" y2="10" />
                 </svg>
               </div>
               <span>Flexibilizar</span>
             </router-link>
             <router-link to="/perfil" class="acceso">
               <div class="acceso-icon">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-                  <circle cx="12" cy="7" r="4"/>
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                  <circle cx="12" cy="7" r="4" />
                 </svg>
               </div>
               <span>Mi perfil</span>
@@ -647,7 +981,9 @@ const tipoColorParcial: Record<string, string> = {
   flex-direction: column;
   gap: 8px;
   box-shadow: var(--shadow-xs);
-  transition: box-shadow var(--transition), transform var(--transition);
+  transition:
+    box-shadow var(--transition),
+    transform var(--transition);
 }
 
 .stat-card:hover {
@@ -700,9 +1036,15 @@ const tipoColorParcial: Record<string, string> = {
   color: var(--color-text-muted);
 }
 
-.stat-pending .stat-value { color: var(--color-warning); }
-.stat-approved .stat-value { color: var(--color-success); }
-.stat-rejected .stat-value { color: var(--color-error); }
+.stat-pending .stat-value {
+  color: var(--color-warning);
+}
+.stat-approved .stat-value {
+  color: var(--color-success);
+}
+.stat-rejected .stat-value {
+  color: var(--color-error);
+}
 
 /* Info bar */
 .info-bar {
@@ -731,7 +1073,9 @@ const tipoColorParcial: Record<string, string> = {
   border: 1px solid var(--color-border-light);
 }
 
-.info-texto strong { color: var(--color-text); }
+.info-texto strong {
+  color: var(--color-text);
+}
 
 /* Main grid */
 .main-grid {
@@ -757,6 +1101,75 @@ const tipoColorParcial: Record<string, string> = {
 
 .card-main {
   min-height: 280px;
+}
+
+.materias-ofertadas {
+  margin-top: 20px;
+}
+
+.materias-ofertadas-subtitle {
+  margin: 5px 0 0;
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+
+.materias-ofertadas-list {
+  display: grid;
+}
+
+.materia-ofertada-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--color-border-light);
+}
+
+.materia-ofertada-row:last-child {
+  border-bottom: 0;
+}
+
+.materia-ofertada-info {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.materia-ofertada-info strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.materia-ofertada-info span,
+.materias-ofertadas-state {
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+
+.materias-ofertadas-state {
+  padding: 18px 20px;
+}
+
+.materias-ofertadas-state .ver-link {
+  margin-left: 6px;
+}
+
+.materia-ofertada-action {
+  flex-shrink: 0;
+  padding: 8px 12px;
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius);
+  color: var(--color-accent);
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.materia-ofertada-action:hover {
+  background: var(--color-accent);
+  color: white;
 }
 
 .card-header {
@@ -789,7 +1202,9 @@ const tipoColorParcial: Record<string, string> = {
   text-decoration: none;
 }
 
-.ver-link:hover { text-decoration: underline; }
+.ver-link:hover {
+  text-decoration: underline;
+}
 
 .card-footer {
   padding: 12px 20px;
@@ -811,7 +1226,10 @@ const tipoColorParcial: Record<string, string> = {
 }
 
 /* Solicitudes */
-.solicitudes-lista { display: flex; flex-direction: column; }
+.solicitudes-lista {
+  display: flex;
+  flex-direction: column;
+}
 
 .solicitud-row {
   display: flex;
@@ -823,8 +1241,12 @@ const tipoColorParcial: Record<string, string> = {
   text-decoration: none;
 }
 
-.solicitud-row:last-child { border-bottom: none; }
-.solicitud-row:hover { background: var(--color-subtle); }
+.solicitud-row:last-child {
+  border-bottom: none;
+}
+.solicitud-row:hover {
+  background: var(--color-subtle);
+}
 
 .sol-tipo-icon {
   width: 36px;
@@ -836,13 +1258,33 @@ const tipoColorParcial: Record<string, string> = {
   flex-shrink: 0;
 }
 
-.tipo-flex { background: #ecfdf5; color: #10b981; }
-.tipo-hab { background: #eff6ff; color: #3b82f6; }
-.tipo-sup { background: #fffbeb; color: #f59e0b; }
+.tipo-flex {
+  background: #ecfdf5;
+  color: #10b981;
+}
+.tipo-hab {
+  background: #eff6ff;
+  color: #3b82f6;
+}
+.tipo-sup {
+  background: #fffbeb;
+  color: #f59e0b;
+}
 
-.sol-info { flex: 1; min-width: 0; }
-.sol-nombre { font-size: 13px; font-weight: 500; color: var(--color-text); }
-.sol-meta { font-size: 11px; color: var(--color-text-muted); margin-top: 2px; }
+.sol-info {
+  flex: 1;
+  min-width: 0;
+}
+.sol-nombre {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text);
+}
+.sol-meta {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  margin-top: 2px;
+}
 
 .sol-rechazo {
   font-size: 11px;
@@ -860,13 +1302,28 @@ const tipoColorParcial: Record<string, string> = {
   flex-shrink: 0;
 }
 
-.badge.pending  { background: var(--color-warning-bg); color: var(--color-warning); }
-.badge.approved { background: var(--color-success-bg); color: var(--color-success); }
-.badge.review   { background: var(--color-info-bg); color: var(--color-info); }
-.badge.rejected { background: var(--color-error-bg); color: var(--color-error); }
+.badge.pending {
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+}
+.badge.approved {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+.badge.review {
+  background: var(--color-info-bg);
+  color: var(--color-info);
+}
+.badge.rejected {
+  background: var(--color-error-bg);
+  color: var(--color-error);
+}
 
 /* Parciales */
-.parciales-lista { display: flex; flex-direction: column; }
+.parciales-lista {
+  display: flex;
+  flex-direction: column;
+}
 
 .parcial-row {
   display: flex;
@@ -876,7 +1333,9 @@ const tipoColorParcial: Record<string, string> = {
   border-bottom: 1px solid var(--color-border-light);
 }
 
-.parcial-row:last-child { border-bottom: none; }
+.parcial-row:last-child {
+  border-bottom: none;
+}
 
 .parcial-dot {
   width: 8px;
@@ -885,8 +1344,16 @@ const tipoColorParcial: Record<string, string> = {
   flex-shrink: 0;
 }
 
-.parcial-materia { font-size: 13px; font-weight: 500; color: var(--color-text); }
-.parcial-meta { font-size: 11px; color: var(--color-text-muted); margin-top: 2px; }
+.parcial-materia {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text);
+}
+.parcial-meta {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  margin-top: 2px;
+}
 
 /* Accesos */
 .accesos-grid {
@@ -933,15 +1400,26 @@ const tipoColorParcial: Record<string, string> = {
   color: white;
 }
 
-.acceso span { font-size: 11px; font-weight: 500; }
+.acceso span {
+  font-size: 11px;
+  font-weight: 500;
+}
 
 /* Loading & empty */
-.loading-state { display: flex; flex-direction: column; }
+.loading-state {
+  display: flex;
+  flex-direction: column;
+}
 
 .skeleton {
   height: 60px;
   margin: 0 20px;
-  background: linear-gradient(90deg, var(--color-border-light) 25%, var(--color-border) 50%, var(--color-border-light) 75%);
+  background: linear-gradient(
+    90deg,
+    var(--color-border-light) 25%,
+    var(--color-border) 50%,
+    var(--color-border-light) 75%
+  );
   background-size: 200% 100%;
   animation: shimmer 1.4s infinite;
   border-bottom: 1px solid var(--color-border-light);
@@ -952,7 +1430,11 @@ const tipoColorParcial: Record<string, string> = {
   text-align: center;
 }
 
-.empty-state.pequeño { padding: 20px; font-size: 13px; color: var(--color-text-muted); }
+.empty-state.pequeño {
+  padding: 20px;
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
 
 .empty-icon {
   width: 56px;
@@ -979,31 +1461,66 @@ const tipoColorParcial: Record<string, string> = {
 }
 
 @keyframes hero-enter {
-  from { opacity: 0; transform: translateY(14px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes shimmer {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
 }
 
 @media (max-width: 1024px) {
-  .acciones-grid { grid-template-columns: 1fr; }
-  .stats-grid { grid-template-columns: repeat(2, 1fr); }
-  .main-grid { grid-template-columns: 1fr; }
+  .acciones-grid {
+    grid-template-columns: 1fr;
+  }
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .main-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 640px) {
-  .btn-hero-cta { max-width: 100%; }
-  .btn-hero-badge { display: none; }
-  .accesos-grid { grid-template-columns: repeat(2, 1fr); }
-  .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
-  .stat-card { padding: 16px; }
-  .stat-value { font-size: 28px; }
+  .btn-hero-cta {
+    max-width: 100%;
+  }
+  .btn-hero-badge {
+    display: none;
+  }
+  .accesos-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+  .materia-ofertada-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .stat-card {
+    padding: 16px;
+  }
+  .stat-value {
+    font-size: 28px;
+  }
 }
 
 @media (max-width: 400px) {
-  .stats-grid { grid-template-columns: 1fr; }
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

@@ -3,7 +3,11 @@ import { computed, onMounted, ref } from "vue";
 import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import { obtenerSesion } from "@/lib/autenticacion/session";
-import { fetchMaterias, type MateriaRegistrada } from "@/lib/dominio/materias";
+import {
+  fetchMaterias,
+  filtrarMaterias,
+  type MateriaRegistrada,
+} from "@/lib/dominio/materias";
 import {
   cancelarSuscripcion,
   cargarSuscripcionesMateria,
@@ -16,6 +20,8 @@ const materias = ref<MateriaRegistrada[]>([]);
 const suscripciones = ref<SuscripcionMateria[]>([]);
 const correoPersonal = ref("");
 const correoConfirmacion = ref("");
+const busqueda = ref("");
+const correoGuardado = ref(false);
 const cargando = ref(true);
 const guardando = ref<string | null>(null);
 const error = ref("");
@@ -25,24 +31,38 @@ const cedula = ref("");
 const suscrita = (codigo: string) =>
   suscripciones.value.some((s) => s.materia_codigo === codigo);
 const tieneCorreo = computed(() => correoPersonal.value.trim().length > 0);
+const materiasDisponibles = computed(() =>
+  filtrarMaterias(materias.value, busqueda.value),
+);
 
 const cargar = async () => {
   const user = auth.currentUser;
   if (!user) return;
   const sesion = await obtenerSesion();
   cedula.value = sesion?.cedula || localStorage.getItem("cedula") || "";
-  const perfil = cedula.value
-    ? await getDoc(doc(db, "usuarios", cedula.value))
-    : null;
-  correoPersonal.value = (perfil?.data()?.correo_personal || "")
-    .toString()
-    .trim();
-  const [catalogo, activas] = await Promise.all([
-    fetchMaterias(),
-    cargarSuscripcionesMateria(user.uid),
-  ]);
+  try {
+    const perfil = cedula.value
+      ? await getDoc(doc(db, "usuarios", cedula.value))
+      : null;
+    correoPersonal.value = (perfil?.data()?.correo_personal || "")
+      .toString()
+      .trim();
+    correoGuardado.value = correoPersonal.value.length > 0;
+  } catch (error) {
+    console.warn(
+      "No se pudo cargar el correo personal; se solicitará al suscribirse:",
+      error,
+    );
+  }
+
+  const catalogo = await fetchMaterias();
   materias.value = catalogo;
-  suscripciones.value = activas;
+
+  try {
+    suscripciones.value = await cargarSuscripcionesMateria(user.uid);
+  } catch (error) {
+    console.warn("No se pudieron cargar las suscripciones existentes:", error);
+  }
 };
 
 const alternar = async (materia: MateriaRegistrada) => {
@@ -75,6 +95,7 @@ const alternar = async (materia: MateriaRegistrada) => {
     } else {
       await guardarCorreoPersonal(cedula.value, correoPersonal.value);
       await suscribirMateria(user.uid, materia, correoPersonal.value);
+      correoGuardado.value = true;
       suscripciones.value.push({
         id: "",
         estudiante_id: user.uid,
@@ -118,7 +139,9 @@ onMounted(async () => {
     </header>
     <section class="materias-contacto">
       <strong>¿Cuál es tu correo electrónico personal?</strong>
-      <p v-if="tieneCorreo">Usaremos este correo en todas tus suscripciones.</p>
+      <p v-if="correoGuardado">
+        Usaremos este correo en todas tus suscripciones.
+      </p>
       <template v-else>
         <p>
           Solo te lo pediremos una vez, al suscribirte a tu primera materia.
@@ -144,38 +167,56 @@ onMounted(async () => {
       {{ mensaje }}
     </p>
     <p v-if="cargando">Cargando materias...</p>
-    <div v-else class="materias-list">
-      <article
-        v-for="materia in materias"
-        :key="materia.id"
-        class="materia-row"
-      >
+    <section v-else class="materias-disponibles">
+      <div class="materias-disponibles-header">
         <div>
-          <strong>{{ materia.codigo }} — {{ materia.nombre }}</strong
-          ><span
-            >{{ materia.semestre || "Semestre no indicado" }} ·
-            {{ materia.profesor || "Profesor no indicado" }}</span
-          >
+          <h2>Clases disponibles para inscripción</h2>
+          <p>
+            Selecciona las materias que estás viendo este semestre.
+            {{ materias.length }} disponibles.
+          </p>
         </div>
-        <button
-          type="button"
-          :disabled="guardando === materia.codigo"
-          :class="{ activa: suscrita(materia.codigo) }"
-          @click="alternar(materia)"
+        <input
+          v-model="busqueda"
+          type="search"
+          class="materias-search"
+          placeholder="Buscar clase..."
+          aria-label="Buscar entre las clases disponibles"
+        />
+      </div>
+      <div class="materias-list">
+        <article
+          v-for="materia in materiasDisponibles"
+          :key="materia.id"
+          class="materia-row"
         >
-          {{
-            guardando === materia.codigo
-              ? "Guardando..."
-              : suscrita(materia.codigo)
-                ? "Suscrita"
-                : "Suscribirme"
-          }}
-        </button>
-      </article>
-      <p v-if="!materias.length">
-        No hay materias registradas para seleccionar.
-      </p>
-    </div>
+          <div>
+            <strong>{{ materia.codigo }} — {{ materia.nombre }}</strong
+            ><span
+              >{{ materia.semestre || "Semestre no indicado" }} ·
+              {{ materia.profesor || "Profesor no indicado" }}</span
+            >
+          </div>
+          <button
+            type="button"
+            :disabled="guardando === materia.codigo"
+            :class="{ activa: suscrita(materia.codigo) }"
+            @click="alternar(materia)"
+          >
+            {{
+              guardando === materia.codigo
+                ? "Guardando..."
+                : suscrita(materia.codigo)
+                  ? "Suscrita"
+                  : "Suscribirme"
+            }}
+          </button>
+        </article>
+        <p v-if="!materiasDisponibles.length">
+          No se encontraron clases con esa búsqueda.
+        </p>
+      </div>
+    </section>
   </div>
 </template>
 
@@ -215,6 +256,28 @@ onMounted(async () => {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 10px;
+}
+.materias-disponibles {
+  margin-top: 24px;
+}
+.materias-disponibles-header {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+.materias-disponibles-header h2 {
+  margin: 0;
+  font-size: 20px;
+}
+.materias-disponibles-header p {
+  margin: 5px 0 0;
+  color: #64748b;
+  font-size: 14px;
+}
+.materias-search {
+  max-width: 260px;
 }
 input {
   width: 100%;
@@ -277,6 +340,13 @@ button:disabled {
 @media (max-width: 640px) {
   .correo-grid {
     grid-template-columns: 1fr;
+  }
+  .materias-disponibles-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .materias-search {
+    max-width: none;
   }
   .materia-row {
     align-items: flex-start;
