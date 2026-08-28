@@ -1,4 +1,5 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const { onDocumentWritten } = require("firebase-functions/v2/firestore");
 const { initializeApp } = require("firebase-admin/app");
 const { getAuth } = require("firebase-admin/auth");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
@@ -118,3 +119,130 @@ exports.cambiarPasswordUsuario = onCall(async (request) => {
 
   return { ok: true, uid };
 });
+
+async function notificarSuscritosAntesDeCambio(before, after) {
+
+  if (!after) return;
+
+  if (
+    before &&
+    before.estado === after.estado
+  ) {
+    return;
+  }
+
+  if (after.estado !== "aprobada") {
+    return;
+  }
+
+
+  const materiaCodigo = after.materia_codigo;
+
+  if (!materiaCodigo) {
+    console.log("Solicitud sin materia_codigo");
+    return;
+  }
+
+
+  const estudiantes = await db
+    .collection("suscripciones_materias")
+    .where(
+      "materia_codigo",
+      "==",
+      materiaCodigo
+    )
+    .get();
+
+
+  if (estudiantes.empty) {
+    console.log("No hay estudiantes inscritos");
+    return;
+  }
+
+
+  const batch = db.batch();
+
+
+estudiantes.forEach(async (doc) => {
+
+  const estudiante = doc.data();
+
+
+  const usuarioSnap = await db
+    .collection("usuarios")
+    .doc(estudiante.estudiante_id)
+    .get();
+
+
+  if (!usuarioSnap.exists) {
+    console.log("Usuario no encontrado:", estudiante.estudiante_id);
+    return;
+  }
+
+
+  const usuario = usuarioSnap.data();
+
+
+  const ref = db
+    .collection("notificaciones")
+    .doc();
+
+
+  batch.set(ref, {
+
+    usuario_id: usuario.auth_uid,
+
+    titulo:
+      "Inasistencia docente aprobada",
+
+    mensaje:
+      `El docente ${after.docente_nombre || ""} tiene una inasistencia aprobada para la materia ${after.materia_label || materiaCodigo}.`,
+
+    tipo:
+      "inasistencia_docente",
+
+    materia_codigo:
+      materiaCodigo,
+
+    solicitud_id:
+      event.params.solicitudId,
+
+    leida:
+      false,
+
+    ruta:
+      "/estudiante/calendario",
+
+    fecha_creacion:
+      FieldValue.serverTimestamp()
+
+  });
+
+});
+
+
+  await batch.commit();
+
+
+  console.log(
+    "Notificaciones enviadas a estudiantes"
+  );
+
+}
+
+exports.notificarSuscritosSolicitud = onDocumentWritten(
+  "solicitudes/{solicitudId}",
+  async (event) => {
+
+    await notificarSuscritosAntesDeCambio(
+      event.data.before.exists
+        ? event.data.before.data()
+        : null,
+
+      event.data.after.exists
+        ? event.data.after.data()
+        : null
+    );
+
+  }
+);
