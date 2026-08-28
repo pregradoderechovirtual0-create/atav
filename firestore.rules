@@ -55,10 +55,12 @@ service cloud.firestore {
       return ['rol', 'password_hash', 'auth_uid', 'registrado'];
     }
 
+    // FIX: antes era /indices/director_uids/{uid} (3 segmentos = ruta de documento
+    // inválida). Ahora es una colección raíz de 2 segmentos: /director_uids/{uid}.
     function esUidDirectorRegistrado(uid) {
       return uid is string
         && uid.size() > 0
-        && exists(/databases/$(database)/documents/indices/director_uids/$(uid));
+        && exists(/databases/$(database)/documents/director_uids/$(uid));
     }
 
     function camposNotificacionValidos() {
@@ -79,9 +81,11 @@ service cloud.firestore {
         && (!('ruta' in request.resource.data) || request.resource.data.ruta == null || request.resource.data.ruta is string);
     }
 
+    // FIX: se agrega 'fecha_reprogramacion_seleccionada' a los campos permitidos,
+    // ya que el flujo de aprobación de inasistencias lo escribe junto con 'estado'.
     function camposSolicitudDirectorUpdate() {
       return request.resource.data.diff(resource.data).affectedKeys()
-        .hasOnly(['estado', 'motivo_rechazo', 'historial', 'actualizado_en']);
+        .hasOnly(['estado', 'motivo_rechazo', 'historial', 'actualizado_en', 'fecha_reprogramacion_seleccionada']);
     }
 
     function estadoSolicitudEstudianteValido() {
@@ -89,7 +93,8 @@ service cloud.firestore {
         && (!('motivo_rechazo' in request.resource.data) || request.resource.data.motivo_rechazo == '');
     }
 
-    match /indices/director_uids/{uid} {
+    // FIX: colección raíz /director_uids/{uid} en lugar de /indices/director_uids/{uid}.
+    match /director_uids/{uid} {
       allow read: if isAuthenticated();
       allow create, update: if esDirector()
         || (isRealUser() && request.auth.uid == uid && esDirector());

@@ -12,53 +12,82 @@ import {
   where,
   getDocs,
 } from "firebase/firestore";
+
 import {
   crearNotificacion,
   rutaNotificacionEstudiante,
 } from "@/lib/dominio/notificaciones";
+
 import {
   formatFechaParcial,
   formatHoraParcial,
 } from "@/lib/dominio/flexibilidadCatalogo";
+
 import { fetchMaterias, type MateriaRegistrada } from "@/lib/dominio/materias";
+
 import {
   subscribeSolicitudesDirector,
   type SolicitudDirector,
 } from "@/lib/director/directorSolicitudesAggregate";
+
 import {
   labelTipoReprogramacion,
   labelTipoAusentismo,
   formatFechaISO,
   formatFechaHoraSolicitud,
 } from "@/lib/solicitudes/docenteSolicitudes";
+
 import { dialog } from "@/lib/nucleo/dialog";
+
+/* =========================================================
+   ESTADO PRINCIPAL
+   ========================================================= */
 
 const solicitudes = ref<SolicitudDirector[]>([]);
 const materiasRegistradas = ref<MateriaRegistrada[]>([]);
 const loading = ref(true);
+
 const busqueda = ref("");
 const activeFilter = ref("todos");
 
-// Modal ver solicitud
+/* =========================================================
+   MODAL VER SOLICITUD
+   ========================================================= */
+
 const modalVerVisible = ref(false);
 const solicitudSeleccionada = ref<any>(null);
 
-// Modal confirmar acción
+/* =========================================================
+   MODAL CONFIRMAR ACCIÓN
+   ========================================================= */
+
 const modalConfirmVisible = ref(false);
 const accionPendiente = ref<"aprobar" | "rechazar" | null>(null);
 const solicitudAccion = ref<any>(null);
+
 const motivoRechazo = ref("");
 const errorMotivoRechazo = ref(false);
 const confirmandoAccion = ref(false);
 
-// Selección de fecha cuando hay varias opciones de reprogramación
+/* =========================================================
+   SELECCIÓN DE FECHA DE REPROGRAMACIÓN
+   ========================================================= */
+
 const fechaReproSeleccionada = ref<string>("");
 const errorFechaRepro = ref(false);
 
-// Toast
+/* =========================================================
+   TOAST
+   ========================================================= */
+
 const toastVisible = ref(false);
 const toastMensaje = ref("");
+
 let toastTimeout: ReturnType<typeof setTimeout>;
+
+/* =========================================================
+   FILTROS
+   ========================================================= */
 
 const filtros = [
   { id: "todos", label: "Todas" },
@@ -67,6 +96,10 @@ const filtros = [
   { id: "Rechazada", label: "Rechazadas" },
 ];
 
+/* =========================================================
+   LABELS
+   ========================================================= */
+
 const tipoLabel: Record<string, string> = {
   flexibilizacion: "Parcial de flexibilización",
   supletorio: "Supletorio",
@@ -74,19 +107,29 @@ const tipoLabel: Record<string, string> = {
   inasistencia: "Inasistencia docente",
 };
 
+/* =========================================================
+   CARGAR SOLICITUDES
+   ========================================================= */
+
 const cargarSolicitudes = async () => {
   try {
     materiasRegistradas.value = await fetchMaterias();
   } catch (e) {
-    console.error(e);
+    console.error("Error cargando materias:", e);
   }
 };
 
 let unsubSolicitudes: (() => void) | null = null;
 
+/* =========================================================
+   MOUNT / UNMOUNT
+   ========================================================= */
+
 onMounted(async () => {
   await cargarSolicitudes();
+
   loading.value = true;
+
   unsubSolicitudes = subscribeSolicitudesDirector(
     materiasRegistradas.value,
     (lista) => {
@@ -94,7 +137,7 @@ onMounted(async () => {
       loading.value = false;
     },
     (err) => {
-      console.error(err);
+      console.error("Error suscribiendo solicitudes:", err);
       loading.value = false;
     },
   );
@@ -103,7 +146,13 @@ onMounted(async () => {
 onUnmounted(() => {
   unsubSolicitudes?.();
   unsubSolicitudes = null;
+
+  clearTimeout(toastTimeout);
 });
+
+/* =========================================================
+   SOLICITUDES FILTRADAS
+   ========================================================= */
 
 const solicitudesFiltradas = computed(() => {
   let lista = solicitudes.value;
@@ -114,6 +163,7 @@ const solicitudesFiltradas = computed(() => {
 
   if (busqueda.value.trim()) {
     const texto = busqueda.value.toLowerCase();
+
     lista = lista.filter(
       (s) =>
         s.nombre?.toLowerCase().includes(texto) ||
@@ -129,56 +179,139 @@ const pendientesCount = computed(
   () => solicitudes.value.filter((s) => s.estado === "Pendiente").length,
 );
 
+/* =========================================================
+   FECHAS DE REPROGRAMACIÓN
+   ========================================================= */
+
+const fechasReprogramacionLista = (
+  sol: SolicitudDirector | any | null | undefined,
+) =>
+  (sol?.fechas_reprogramacion || []).filter(
+    (fecha: unknown): fecha is string =>
+      typeof fecha === "string" && Boolean(fecha),
+  );
+
+/* =========================================================
+   MODAL DE DETALLE
+   ========================================================= */
+
 const verSolicitud = (sol: any) => {
   solicitudSeleccionada.value = sol;
+
+  /*
+   * Si la solicitud ya tiene una fecha seleccionada,
+   * la mostramos como seleccionada.
+   *
+   * Si tiene una sola fecha propuesta y todavía está
+   * pendiente, la seleccionamos automáticamente.
+   *
+   * Si tiene varias fechas, dejamos que el usuario elija.
+   */
+  const fechas = fechasReprogramacionLista(sol);
+
+  if (sol.tipo === "inasistencia" && sol.estado === "Pendiente") {
+    if (sol.fecha_reprogramacion_seleccionada) {
+      fechaReproSeleccionada.value = sol.fecha_reprogramacion_seleccionada;
+    } else if (fechas.length === 1) {
+      fechaReproSeleccionada.value = fechas[0];
+    } else {
+      fechaReproSeleccionada.value = "";
+    }
+  } else {
+    fechaReproSeleccionada.value = sol.fecha_reprogramacion_seleccionada || "";
+  }
+
+  errorFechaRepro.value = false;
   modalVerVisible.value = true;
 };
 
-/**
- * Determina si al aprobar una solicitud es obligatorio
- * que el director/practicante seleccione una fecha.
- *
- * Solo aplica para solicitudes de inasistencia que
- * tengan más de una fecha propuesta.
- */
-const requiereSeleccionFecha = computed(
-  () =>
-    accionPendiente.value === "aprobar" &&
-    solicitudAccion.value?.tipo === "inasistencia" &&
-    fechasReprogramacionLista(solicitudAccion.value).length > 1,
-);
+/* =========================================================
+   SELECCIONAR FECHA DESDE EL MODAL DE DETALLE
+   ========================================================= */
 
-/**
- * Abre el modal de confirmación.
- *
- * Si la solicitud tiene una sola fecha propuesta,
- * esta se selecciona automáticamente.
- *
- * Si tiene varias fechas, la selección queda vacía
- * para obligar al director/practicante a elegir una.
- */
+const seleccionarFechaReprogramacion = (fecha: string) => {
+  if (!solicitudSeleccionada.value) return;
+
+  /*
+   * Solo permitimos cambiar la fecha mientras
+   * la solicitud esté pendiente.
+   */
+  if (solicitudSeleccionada.value.estado !== "Pendiente") {
+    return;
+  }
+
+  fechaReproSeleccionada.value = fecha;
+  errorFechaRepro.value = false;
+};
+
+/* =========================================================
+   REQUIERE SELECCIÓN DE FECHA
+   ========================================================= */
+
+const requiereSeleccionFecha = computed(() => {
+  if (accionPendiente.value !== "aprobar") {
+    return false;
+  }
+
+  if (solicitudAccion.value?.tipo !== "inasistencia") {
+    return false;
+  }
+
+  return fechasReprogramacionLista(solicitudAccion.value).length > 1;
+});
+
+/* =========================================================
+   PEDIR CONFIRMACIÓN
+   ========================================================= */
+
 const pedirConfirmacion = (sol: any, accion: "aprobar" | "rechazar") => {
+  /*
+   * Guardamos primero la selección realizada en el modal
+   * de detalle para no perderla.
+   */
+  const seleccionActual = fechaReproSeleccionada.value;
+
   solicitudAccion.value = sol;
   accionPendiente.value = accion;
 
   motivoRechazo.value = "";
   errorMotivoRechazo.value = false;
+  errorFechaRepro.value = false;
 
   const fechas = fechasReprogramacionLista(sol);
 
-  fechaReproSeleccionada.value =
-    accion === "aprobar" && sol.tipo === "inasistencia" && fechas.length === 1
-      ? fechas[0]
-      : "";
-
-  errorFechaRepro.value = false;
+  if (accion === "aprobar" && sol.tipo === "inasistencia") {
+    /*
+     * Prioridad:
+     *
+     * 1. Fecha seleccionada actualmente.
+     * 2. Fecha previamente guardada en Firestore.
+     * 3. Si solo existe una opción, se selecciona automáticamente.
+     * 4. Si existen varias, queda vacío.
+     */
+    if (seleccionActual && fechas.includes(seleccionActual)) {
+      fechaReproSeleccionada.value = seleccionActual;
+    } else if (
+      sol.fecha_reprogramacion_seleccionada &&
+      fechas.includes(sol.fecha_reprogramacion_seleccionada)
+    ) {
+      fechaReproSeleccionada.value = sol.fecha_reprogramacion_seleccionada;
+    } else if (fechas.length === 1) {
+      fechaReproSeleccionada.value = fechas[0];
+    } else {
+      fechaReproSeleccionada.value = "";
+    }
+  } else {
+    fechaReproSeleccionada.value = "";
+  }
 
   modalConfirmVisible.value = true;
 };
 
-/**
- * Valida la información antes de ejecutar la acción.
- */
+/* =========================================================
+   INTENTAR CONFIRMAR
+   ========================================================= */
+
 const intentarConfirmar = () => {
   if (accionPendiente.value === "rechazar" && !motivoRechazo.value.trim()) {
     errorMotivoRechazo.value = true;
@@ -196,20 +329,16 @@ const intentarConfirmar = () => {
   confirmarAccion();
 };
 
-/**
- * Aprueba o rechaza la solicitud.
- *
- * Cuando se aprueba una solicitud de inasistencia:
- * - Si tiene una sola fecha, se utiliza automáticamente.
- * - Si tiene varias fechas, se guarda la fecha elegida.
- * - Se registra la fecha en el historial.
- * - Se guarda fecha_reprogramacion_seleccionada en Firestore.
- * - La notificación al docente incluye la fecha elegida.
- */
-const confirmarAccion = async () => {
-  if (!solicitudAccion.value || !accionPendiente.value) return;
+/* =========================================================
+   CONFIRMAR ACCIÓN
+   ========================================================= */
 
-  // Validación adicional por seguridad
+const confirmarAccion = async () => {
+  if (!solicitudAccion.value || !accionPendiente.value) {
+    return;
+  }
+
+  /* Validación adicional */
   if (accionPendiente.value === "rechazar" && !motivoRechazo.value.trim()) {
     errorMotivoRechazo.value = true;
     return;
@@ -230,7 +359,10 @@ const confirmarAccion = async () => {
   const estadoGuardar = nuevoEstado.toLowerCase();
 
   try {
-    // 1. Actualizar estado en Firestore
+    /* =====================================================
+       1. ACTUALIZAR FIRESTORE
+       ===================================================== */
+
     const payload: Record<string, unknown> = {
       estado: estadoGuardar,
       actualizado_en: serverTimestamp(),
@@ -254,19 +386,22 @@ const confirmarAccion = async () => {
       }),
     };
 
-    // Guardar motivo de rechazo
+    /* Motivo de rechazo */
     if (accionPendiente.value === "rechazar") {
       payload.motivo_rechazo = motivoRechazo.value.trim();
     }
 
-    // Guardar fecha definitiva seleccionada
+    /* Fecha definitiva */
     if (accionPendiente.value === "aprobar" && fechaReproSeleccionada.value) {
       payload.fecha_reprogramacion_seleccionada = fechaReproSeleccionada.value;
     }
 
     await updateDoc(doc(db, coleccion, solicitudAccion.value.id), payload);
 
-    // 2. Actualizar estado en el array local
+    /* =====================================================
+       2. ACTUALIZAR ARRAY LOCAL
+       ===================================================== */
+
     const idx = solicitudes.value.findIndex(
       (s) => s.id === solicitudAccion.value.id,
     );
@@ -284,7 +419,30 @@ const confirmarAccion = async () => {
       }
     }
 
-    // 3. Crear notificación para el estudiante/docente
+    /* =====================================================
+       3. ACTUALIZAR SOLICITUD SELECCIONADA
+       ===================================================== */
+
+    if (
+      solicitudSeleccionada.value &&
+      solicitudSeleccionada.value.id === solicitudAccion.value.id
+    ) {
+      solicitudSeleccionada.value.estado = nuevoEstado;
+
+      if (accionPendiente.value === "aprobar" && fechaReproSeleccionada.value) {
+        solicitudSeleccionada.value.fecha_reprogramacion_seleccionada =
+          fechaReproSeleccionada.value;
+      }
+
+      if (accionPendiente.value === "rechazar") {
+        solicitudSeleccionada.value.motivo_rechazo = motivoRechazo.value.trim();
+      }
+    }
+
+    /* =====================================================
+       4. NOTIFICAR SOLICITANTE
+       ===================================================== */
+
     const destinatario =
       solicitudAccion.value.estudiante_id ||
       solicitudAccion.value.docente_id ||
@@ -308,13 +466,13 @@ const confirmarAccion = async () => {
         if (esAprobada) {
           mensajeNotificacion = `Tu solicitud de ${tipoSolicitud.toLowerCase()} para la materia ${solicitudAccion.value.materia} fue aprobada por la Dirección del Programa.`;
 
-          // Si existe una fecha de reprogramación seleccionada,
-          // informar al docente cuál fue la fecha definitiva.
           if (
             solicitudAccion.value.tipo === "inasistencia" &&
             fechaReproSeleccionada.value
           ) {
-            mensajeNotificacion += `\n\nLa fecha de reprogramación seleccionada es: ${formatFechaHoraSolicitud(fechaReproSeleccionada.value)}.`;
+            mensajeNotificacion += `\n\nLa fecha de reprogramación seleccionada es: ${formatFechaHoraSolicitud(
+              fechaReproSeleccionada.value,
+            )}.`;
           }
         } else {
           mensajeNotificacion = `Tu solicitud de ${tipoSolicitud.toLowerCase()} para la materia ${solicitudAccion.value.materia} fue rechazada.\n\nMotivo: ${motivoRechazo.value}`;
@@ -332,8 +490,10 @@ const confirmarAccion = async () => {
       }
     }
 
-    // 4. Notificar estudiantes inscritos cuando se aprueba
-    // una inasistencia docente
+    /* =====================================================
+       5. NOTIFICAR ESTUDIANTES
+       ===================================================== */
+
     if (
       accionPendiente.value === "aprobar" &&
       solicitudAccion.value.tipo === "inasistencia"
@@ -368,36 +528,73 @@ const confirmarAccion = async () => {
 
     mostrarToast(`Solicitud ${nuevoEstado.toLowerCase()} correctamente`);
   } catch (e) {
-    console.error(e);
+    console.error("Error procesando solicitud:", e);
+
+    mostrarToast("No se pudo procesar la solicitud");
   } finally {
     confirmandoAccion.value = false;
+
     modalConfirmVisible.value = false;
+
     solicitudAccion.value = null;
     accionPendiente.value = null;
+
     motivoRechazo.value = "";
-    fechaReproSeleccionada.value = "";
+
+    errorMotivoRechazo.value = false;
     errorFechaRepro.value = false;
+
+    /*
+     * No limpiamos fechaReproSeleccionada aquí inmediatamente
+     * porque puede seguir siendo necesaria para mostrar
+     * correctamente la solicitud seleccionada.
+     */
+    if (!solicitudSeleccionada.value) {
+      fechaReproSeleccionada.value = "";
+    }
   }
 };
 
-/**
- * Cancela la acción y limpia todos los estados temporales.
- */
+/* =========================================================
+   CANCELAR ACCIÓN
+   ========================================================= */
+
 const cancelarAccion = () => {
   modalConfirmVisible.value = false;
+
   solicitudAccion.value = null;
   accionPendiente.value = null;
+
   motivoRechazo.value = "";
+
   errorMotivoRechazo.value = false;
-  fechaReproSeleccionada.value = "";
   errorFechaRepro.value = false;
+
+  /*
+   * No limpiamos la fecha para conservar la selección
+   * que pudo haber hecho el usuario desde el modal de detalle.
+   */
 };
+
+/* =========================================================
+   CERRAR MODAL DE DETALLE
+   ========================================================= */
+
+const cerrarModalDetalle = () => {
+  modalVerVisible.value = false;
+};
+
+/* =========================================================
+   ELIMINAR SOLICITUD
+   ========================================================= */
 
 const eliminarSolicitud = async (sol: any) => {
   const tipo = tipoLabel[sol.tipo] || sol.tipo || "Solicitud";
 
   const ok = await dialog.confirm(
-    `¿Eliminar la solicitud de ${sol.nombre || "este usuario"} (${tipo})? Esta acción no se puede deshacer.`,
+    `¿Eliminar la solicitud de ${
+      sol.nombre || "este usuario"
+    } (${tipo})? Esta acción no se puede deshacer.`,
     {
       title: "Eliminar solicitud",
       variant: "danger",
@@ -414,6 +611,11 @@ const eliminarSolicitud = async (sol: any) => {
 
     solicitudes.value = solicitudes.value.filter((s) => s.id !== sol.id);
 
+    if (solicitudSeleccionada.value?.id === sol.id) {
+      solicitudSeleccionada.value = null;
+      modalVerVisible.value = false;
+    }
+
     mostrarToast("Solicitud eliminada correctamente");
   } catch (e) {
     console.error(e);
@@ -423,6 +625,10 @@ const eliminarSolicitud = async (sol: any) => {
     });
   }
 };
+
+/* =========================================================
+   TOAST
+   ========================================================= */
 
 const mostrarToast = (mensaje: string) => {
   toastMensaje.value = mensaje;
@@ -434,6 +640,10 @@ const mostrarToast = (mensaje: string) => {
     toastVisible.value = false;
   }, 3000);
 };
+
+/* =========================================================
+   UTILIDADES
+   ========================================================= */
 
 const badgeEstado = (estado: string) => {
   const map: Record<string, string> = {
@@ -469,27 +679,38 @@ const inicialesNombre = (nombre: string) => {
     .join("")
     .toUpperCase();
 };
-
-const fechasReprogramacionLista = (sol: SolicitudDirector | null | undefined) =>
-  (sol?.fechas_reprogramacion || []).filter(Boolean);
 </script>
 
 <template>
   <div class="solicitudes-page">
+    <!-- =====================================================
+         HEADER
+         ===================================================== -->
+
     <div class="page-header">
       <div v-if="pendientesCount > 0" class="pending-pill">
         <span class="pending-dot" />
+
         {{ pendientesCount }}
         pendiente{{ pendientesCount !== 1 ? "s" : "" }}
       </div>
     </div>
+
+    <!-- =====================================================
+         TOOLBAR
+         ===================================================== -->
 
     <div class="toolbar">
       <div class="filter-tabs">
         <button
           v-for="filtro in filtros"
           :key="filtro.id"
-          :class="['filter-tab', { active: activeFilter === filtro.id }]"
+          :class="[
+            'filter-tab',
+            {
+              active: activeFilter === filtro.id,
+            },
+          ]"
           @click="activeFilter = filtro.id"
         >
           {{ filtro.label }}
@@ -507,6 +728,7 @@ const fechasReprogramacionLista = (sol: SolicitudDirector | null | undefined) =>
           stroke-width="2"
         >
           <circle cx="11" cy="11" r="8" />
+
           <line x1="21" y1="21" x2="16.65" y2="16.65" />
         </svg>
 
@@ -526,16 +748,26 @@ const fechasReprogramacionLista = (sol: SolicitudDirector | null | undefined) =>
             stroke-width="2.5"
           >
             <line x1="18" y1="6" x2="6" y2="18" />
+
             <line x1="6" y1="6" x2="18" y2="18" />
           </svg>
         </button>
       </div>
     </div>
 
+    <!-- =====================================================
+         LOADING
+         ===================================================== -->
+
     <div v-if="loading" class="loading-state">
       <div class="spinner" />
-      <span>Cargando solicitudes...</span>
+
+      <span> Cargando solicitudes... </span>
     </div>
+
+    <!-- =====================================================
+         LISTADO
+         ===================================================== -->
 
     <div v-else class="card">
       <div v-if="solicitudesFiltradas.length === 0" class="empty-state">
@@ -550,6 +782,7 @@ const fechasReprogramacionLista = (sol: SolicitudDirector | null | undefined) =>
           <path
             d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
           />
+
           <polyline points="14 2 14 8 20 8" />
         </svg>
 
@@ -583,13 +816,13 @@ const fechasReprogramacionLista = (sol: SolicitudDirector | null | undefined) =>
                   {{ tipoLabel[sol.tipo] ?? sol.tipo }}
                 </span>
 
-                <span class="separator">·</span>
+                <span class="separator"> · </span>
 
                 <span>
                   {{ sol.materia ?? "—" }}
                 </span>
 
-                <span class="separator">·</span>
+                <span class="separator"> · </span>
 
                 <span>
                   {{ formatFecha(sol.creadoEn) }}
@@ -603,6 +836,7 @@ const fechasReprogramacionLista = (sol: SolicitudDirector | null | undefined) =>
           </div>
 
           <div class="request-actions">
+            <!-- VER -->
             <button class="action-btn view" @click="verSolicitud(sol)">
               <svg
                 width="15"
@@ -613,12 +847,14 @@ const fechasReprogramacionLista = (sol: SolicitudDirector | null | undefined) =>
                 stroke-width="2"
               >
                 <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+
                 <circle cx="12" cy="12" r="3" />
               </svg>
 
               Ver
             </button>
 
+            <!-- APROBAR -->
             <button
               v-if="sol.estado === 'Pendiente'"
               class="action-btn approve"
@@ -638,6 +874,7 @@ const fechasReprogramacionLista = (sol: SolicitudDirector | null | undefined) =>
               Aprobar
             </button>
 
+            <!-- RECHAZAR -->
             <button
               v-if="sol.estado === 'Pendiente'"
               class="action-btn reject"
@@ -652,12 +889,14 @@ const fechasReprogramacionLista = (sol: SolicitudDirector | null | undefined) =>
                 stroke-width="2"
               >
                 <line x1="18" y1="6" x2="6" y2="18" />
+
                 <line x1="6" y1="6" x2="18" y2="18" />
               </svg>
 
               Rechazar
             </button>
 
+            <!-- ELIMINAR -->
             <button
               v-if="sol.estado !== 'Pendiente'"
               class="action-btn delete"
@@ -673,8 +912,11 @@ const fechasReprogramacionLista = (sol: SolicitudDirector | null | undefined) =>
                 stroke-width="2"
               >
                 <polyline points="3 6 5 6 21 6" />
+
                 <path d="M19 6l-1 14H6L5 6" />
+
                 <path d="M10 11v6M14 11v6" />
+
                 <path d="M9 6V4h6v2" />
               </svg>
 
@@ -685,23 +927,32 @@ const fechasReprogramacionLista = (sol: SolicitudDirector | null | undefined) =>
       </div>
     </div>
 
+    <!-- =====================================================
+         PAGINACIÓN
+         ===================================================== -->
+
     <div class="pagination">
       <span class="pagination-info">
-        {{ solicitudesFiltradas.length }} solicitudes
+        {{ solicitudesFiltradas.length }}
+        solicitudes
       </span>
     </div>
 
-    <!-- MODAL VER SOLICITUD -->
+    <!-- =====================================================
+         MODAL VER SOLICITUD
+         ===================================================== -->
+
     <Teleport to="body">
       <Transition name="modal">
         <div
           v-if="modalVerVisible"
           class="modal-overlay"
-          @click.self="modalVerVisible = false"
+          @click.self="cerrarModalDetalle"
         >
           <div class="modal-card modal-card--detail">
+            <!-- HEADER -->
             <div class="modal-header modal-header--detail">
-              <div class="detail-hero" v-if="solicitudSeleccionada">
+              <div v-if="solicitudSeleccionada" class="detail-hero">
                 <div class="detail-hero-avatar">
                   {{ inicialesNombre(solicitudSeleccionada.nombre) }}
                 </div>
@@ -716,6 +967,7 @@ const fechasReprogramacionLista = (sol: SolicitudDirector | null | undefined) =>
                       tipoLabel[solicitudSeleccionada.tipo] ??
                       solicitudSeleccionada.tipo
                     }}
+
                     · Cédula
                     {{ solicitudSeleccionada.cedula ?? "—" }}
                   </p>
@@ -738,7 +990,7 @@ const fechasReprogramacionLista = (sol: SolicitudDirector | null | undefined) =>
                 </div>
               </div>
 
-              <button class="modal-close" @click="modalVerVisible = false">
+              <button class="modal-close" @click="cerrarModalDetalle">
                 <svg
                   width="18"
                   height="18"
@@ -748,6 +1000,7 @@ const fechasReprogramacionLista = (sol: SolicitudDirector | null | undefined) =>
                   stroke-width="2.5"
                 >
                   <line x1="18" y1="6" x2="6" y2="18" />
+
                   <line x1="6" y1="6" x2="18" y2="18" />
                 </svg>
               </button>
@@ -755,27 +1008,17 @@ const fechasReprogramacionLista = (sol: SolicitudDirector | null | undefined) =>
 
             <div class="modal-divider" />
 
+            <!-- BODY -->
             <div
-              class="modal-body modal-body--detail"
               v-if="solicitudSeleccionada"
+              class="modal-body modal-body--detail"
             >
-              <!-- DATOS DEL SOLICITANTE -->
+              <!-- =================================================
+                   DATOS DEL SOLICITANTE
+                   ================================================= -->
+
               <section class="detail-section">
                 <div class="detail-section-head">
-                  <span class="detail-section-icon">
-                    <svg
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                    >
-                      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                      <circle cx="12" cy="7" r="4" />
-                    </svg>
-                  </span>
-
                   <h3 class="detail-section-title">Datos del solicitante</h3>
                 </div>
 
@@ -806,28 +1049,15 @@ const fechasReprogramacionLista = (sol: SolicitudDirector | null | undefined) =>
                 </div>
               </section>
 
-              <!-- FLEXIBILIZACIÓN -->
+              <!-- =================================================
+                   FLEXIBILIZACIÓN
+                   ================================================= -->
+
               <section
-                class="detail-section"
                 v-if="solicitudSeleccionada.tipo === 'flexibilizacion'"
+                class="detail-section"
               >
                 <div class="detail-section-head">
-                  <span class="detail-section-icon detail-section-icon--accent">
-                    <svg
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                    >
-                      <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-                      <line x1="16" y1="2" x2="16" y2="6" />
-                      <line x1="8" y1="2" x2="8" y2="6" />
-                      <line x1="3" y1="10" x2="21" y2="10" />
-                    </svg>
-                  </span>
-
                   <h3 class="detail-section-title">
                     Flexibilización de parcial
                   </h3>
@@ -871,28 +1101,15 @@ const fechasReprogramacionLista = (sol: SolicitudDirector | null | undefined) =>
                 </div>
               </section>
 
-              <!-- PERIODO DE AUSENCIA -->
+              <!-- =================================================
+                   PERIODO DE AUSENCIA
+                   ================================================= -->
+
               <section
-                class="detail-section"
                 v-if="solicitudSeleccionada.tipo === 'inasistencia'"
+                class="detail-section"
               >
                 <div class="detail-section-head">
-                  <span class="detail-section-icon detail-section-icon--accent">
-                    <svg
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                    >
-                      <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-                      <line x1="16" y1="2" x2="16" y2="6" />
-                      <line x1="8" y1="2" x2="8" y2="6" />
-                      <line x1="3" y1="10" x2="21" y2="10" />
-                    </svg>
-                  </span>
-
                   <h3 class="detail-section-title">Periodo de ausencia</h3>
                 </div>
 
@@ -939,26 +1156,15 @@ const fechasReprogramacionLista = (sol: SolicitudDirector | null | undefined) =>
                 </div>
               </section>
 
-              <!-- REPROGRAMACIÓN PROPUESTA -->
+              <!-- =================================================
+                   REPROGRAMACIÓN PROPUESTA
+                   ================================================= -->
+
               <section
-                class="detail-section"
                 v-if="solicitudSeleccionada.tipo === 'inasistencia'"
+                class="detail-section"
               >
                 <div class="detail-section-head">
-                  <span class="detail-section-icon detail-section-icon--accent">
-                    <svg
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                    >
-                      <circle cx="12" cy="12" r="10" />
-                      <polyline points="12 6 12 12 16 14" />
-                    </svg>
-                  </span>
-
                   <h3 class="detail-section-title">Reprogramación propuesta</h3>
                 </div>
 
@@ -976,42 +1182,85 @@ const fechasReprogramacionLista = (sol: SolicitudDirector | null | undefined) =>
                   </div>
                 </div>
 
-                <!-- FECHAS PROPUESTAS -->
+                <!-- =================================================
+                     FECHAS PROPUESTAS SELECCIONABLES
+                     ================================================= -->
+
                 <div
                   v-if="fechasReprogramacionLista(solicitudSeleccionada).length"
                   class="repro-opciones"
                 >
-                  <div
+                  <div class="repro-opciones-title">
+                    <span>
+                      {{
+                        solicitudSeleccionada.estado === "Pendiente"
+                          ? "Selecciona una fecha"
+                          : "Fechas propuestas"
+                      }}
+                    </span>
+
+                    <span
+                      v-if="solicitudSeleccionada.estado === 'Pendiente'"
+                      class="repro-required"
+                    >
+                      Selección requerida
+                    </span>
+                  </div>
+
+                  <!--
+                    IMPORTANTE:
+                    Cada opción ahora es un botón.
+                    Esto permite seleccionar directamente
+                    la fecha propuesta.
+                  -->
+
+                  <button
                     v-for="(fecha, idx) in fechasReprogramacionLista(
                       solicitudSeleccionada,
                     )"
                     :key="idx"
+                    type="button"
+                    :disabled="solicitudSeleccionada.estado !== 'Pendiente'"
                     :class="[
                       'repro-opcion',
                       {
                         'repro-opcion--elegida':
-                          solicitudSeleccionada.fecha_reprogramacion_seleccionada ===
-                          fecha,
+                          fechaReproSeleccionada === fecha,
+                        'repro-opcion--disabled':
+                          solicitudSeleccionada.estado !== 'Pendiente',
                       },
                     ]"
+                    @click="seleccionarFechaReprogramacion(fecha)"
                   >
-                    <span class="repro-opcion-num"> Opción {{ idx + 1 }} </span>
-
-                    <span class="repro-opcion-fecha">
-                      {{ formatFechaHoraSolicitud(fecha) }}
+                    <span
+                      class="repro-radio"
+                      :class="{
+                        checked: fechaReproSeleccionada === fecha,
+                      }"
+                    >
+                      <span
+                        v-if="fechaReproSeleccionada === fecha"
+                        class="repro-radio-dot"
+                      />
                     </span>
 
-                    <!-- MARCAR LA FECHA APROBADA -->
+                    <span class="repro-opcion-content">
+                      <span class="repro-opcion-num">
+                        Opción {{ idx + 1 }}
+                      </span>
+
+                      <span class="repro-opcion-fecha">
+                        {{ formatFechaHoraSolicitud(fecha) }}
+                      </span>
+                    </span>
+
                     <span
-                      v-if="
-                        solicitudSeleccionada.fecha_reprogramacion_seleccionada ===
-                        fecha
-                      "
+                      v-if="fechaReproSeleccionada === fecha"
                       class="repro-opcion-badge"
                     >
                       Seleccionada
                     </span>
-                  </div>
+                  </button>
                 </div>
 
                 <p v-else class="detail-text detail-text--muted">
@@ -1019,28 +1268,15 @@ const fechasReprogramacionLista = (sol: SolicitudDirector | null | undefined) =>
                 </p>
               </section>
 
-              <!-- INFORMACIÓN ACADÉMICA -->
+              <!-- =================================================
+                   INFORMACIÓN ACADÉMICA
+                   ================================================= -->
+
               <section
-                class="detail-section"
                 v-else-if="solicitudSeleccionada.tipo !== 'flexibilizacion'"
+                class="detail-section"
               >
                 <div class="detail-section-head">
-                  <span class="detail-section-icon detail-section-icon--accent">
-                    <svg
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                    >
-                      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
-                      <path
-                        d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"
-                      />
-                    </svg>
-                  </span>
-
                   <h3 class="detail-section-title">Información académica</h3>
                 </div>
 
@@ -1066,27 +1302,15 @@ const fechasReprogramacionLista = (sol: SolicitudDirector | null | undefined) =>
                 </div>
               </section>
 
-              <!-- CONTACTO -->
+              <!-- =================================================
+                   CONTACTO
+                   ================================================= -->
+
               <section
-                class="detail-section"
                 v-if="solicitudSeleccionada.tipo === 'flexibilizacion'"
+                class="detail-section"
               >
                 <div class="detail-section-head">
-                  <span class="detail-section-icon">
-                    <svg
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                    >
-                      <path
-                        d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"
-                      />
-                    </svg>
-                  </span>
-
                   <h3 class="detail-section-title">Contacto</h3>
                 </div>
 
@@ -1109,24 +1333,12 @@ const fechasReprogramacionLista = (sol: SolicitudDirector | null | undefined) =>
                 </div>
               </section>
 
-              <!-- MOTIVO -->
+              <!-- =================================================
+                   MOTIVO
+                   ================================================= -->
+
               <section class="detail-section">
                 <div class="detail-section-head">
-                  <span class="detail-section-icon detail-section-icon--warn">
-                    <svg
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                    >
-                      <circle cx="12" cy="12" r="10" />
-                      <line x1="12" y1="8" x2="12" y2="12" />
-                      <line x1="12" y1="16" x2="12.01" y2="16" />
-                    </svg>
-                  </span>
-
                   <h3 class="detail-section-title">
                     {{
                       solicitudSeleccionada.tipo === "flexibilizacion"
@@ -1141,7 +1353,10 @@ const fechasReprogramacionLista = (sol: SolicitudDirector | null | undefined) =>
                 </p>
               </section>
 
-              <!-- DESCRIPCIÓN -->
+              <!-- =================================================
+                   DESCRIPCIÓN
+                   ================================================= -->
+
               <section
                 v-if="
                   solicitudSeleccionada.descripcion &&
@@ -1150,22 +1365,6 @@ const fechasReprogramacionLista = (sol: SolicitudDirector | null | undefined) =>
                 class="detail-section"
               >
                 <div class="detail-section-head">
-                  <span class="detail-section-icon">
-                    <svg
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                    >
-                      <line x1="17" y1="10" x2="3" y2="10" />
-                      <line x1="21" y1="6" x2="3" y2="6" />
-                      <line x1="21" y1="14" x2="3" y2="14" />
-                      <line x1="17" y1="18" x2="3" y2="18" />
-                    </svg>
-                  </span>
-
                   <h3 class="detail-section-title">Descripción adicional</h3>
                 </div>
 
@@ -1174,7 +1373,10 @@ const fechasReprogramacionLista = (sol: SolicitudDirector | null | undefined) =>
                 </p>
               </section>
 
-              <!-- PDF -->
+              <!-- =================================================
+                   PDF
+                   ================================================= -->
+
               <section
                 v-if="solicitudSeleccionada.pdf_url"
                 class="detail-section"
@@ -1186,6 +1388,7 @@ const fechasReprogramacionLista = (sol: SolicitudDirector | null | undefined) =>
                 <a
                   :href="solicitudSeleccionada.pdf_url"
                   target="_blank"
+                  rel="noopener noreferrer"
                   class="pdf-link"
                 >
                   <svg
@@ -1199,6 +1402,7 @@ const fechasReprogramacionLista = (sol: SolicitudDirector | null | undefined) =>
                     <path
                       d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
                     />
+
                     <polyline points="14 2 14 8 20 8" />
                   </svg>
 
@@ -1207,8 +1411,12 @@ const fechasReprogramacionLista = (sol: SolicitudDirector | null | undefined) =>
               </section>
             </div>
 
+            <!-- =================================================
+                 FOOTER MODAL DETALLE
+                 ================================================= -->
+
             <div class="modal-footer modal-footer--detail">
-              <button class="btn btn-ghost" @click="modalVerVisible = false">
+              <button class="btn btn-ghost" @click="cerrarModalDetalle">
                 Cerrar
               </button>
 
@@ -1239,11 +1447,19 @@ const fechasReprogramacionLista = (sol: SolicitudDirector | null | undefined) =>
       </Transition>
     </Teleport>
 
-    <!-- MODAL CONFIRMAR ACCIÓN -->
+    <!-- =====================================================
+         MODAL CONFIRMAR ACCIÓN
+         ===================================================== -->
+
     <Teleport to="body">
       <Transition name="modal">
-        <div v-if="modalConfirmVisible" class="modal-overlay">
+        <div
+          v-if="modalConfirmVisible"
+          class="modal-overlay"
+          @click.self="cancelarAccion"
+        >
           <div class="modal-card modal-card--sm">
+            <!-- HEADER -->
             <div class="modal-header">
               <div>
                 <h2 class="modal-title">
@@ -1260,21 +1476,30 @@ const fechasReprogramacionLista = (sol: SolicitudDirector | null | undefined) =>
               </div>
             </div>
 
+            <!-- BODY -->
             <div class="modal-body">
               <p class="confirm-text">
                 ¿Seguro que deseas
+
                 <strong>
                   {{ accionPendiente === "aprobar" ? "aprobar" : "rechazar" }}
                 </strong>
+
                 la solicitud de
-                <strong> {{ solicitudAccion?.nombre }} </strong>?
+
+                <strong>
+                  {{ solicitudAccion?.nombre }} </strong
+                >?
               </p>
 
-              <!-- MOTIVO DE RECHAZO -->
+              <!-- =================================================
+                   MOTIVO RECHAZO
+                   ================================================= -->
+
               <div v-if="accionPendiente === 'rechazar'" class="form-group">
                 <label class="detail-label">
                   Motivo de rechazo
-                  <span style="color: #dc2626">*</span>
+                  <span style="color: #dc2626"> * </span>
                 </label>
 
                 <textarea
@@ -1293,11 +1518,23 @@ const fechasReprogramacionLista = (sol: SolicitudDirector | null | undefined) =>
                 </p>
               </div>
 
-              <!-- SELECCIÓN DE FECHA DE REPROGRAMACIÓN -->
-              <div v-if="requiereSeleccionFecha" class="form-group">
+              <!-- =================================================
+                   SELECCIÓN DE FECHA
+                   ================================================= -->
+
+              <div
+                v-if="
+                  accionPendiente === 'aprobar' &&
+                  solicitudAccion?.tipo === 'inasistencia' &&
+                  fechasReprogramacionLista(solicitudAccion).length
+                "
+                class="form-group"
+              >
                 <label class="detail-label">
-                  Selecciona la fecha de reprogramación
-                  <span style="color: #dc2626">*</span>
+                  Fecha de reprogramación
+                  <span v-if="requiereSeleccionFecha" style="color: #dc2626">
+                    *
+                  </span>
                 </label>
 
                 <div
@@ -1312,6 +1549,9 @@ const fechasReprogramacionLista = (sol: SolicitudDirector | null | undefined) =>
                     )"
                     :key="idx"
                     class="repro-opcion-radio"
+                    :class="{
+                      selected: fechaReproSeleccionada === fecha,
+                    }"
                   >
                     <input
                       type="radio"
@@ -1339,6 +1579,7 @@ const fechasReprogramacionLista = (sol: SolicitudDirector | null | undefined) =>
               </div>
             </div>
 
+            <!-- FOOTER -->
             <div class="modal-footer">
               <button class="btn btn-ghost" @click="cancelarAccion">
                 Cancelar
@@ -1352,7 +1593,7 @@ const fechasReprogramacionLista = (sol: SolicitudDirector | null | undefined) =>
                 :disabled="confirmandoAccion"
                 @click="intentarConfirmar"
               >
-                <span v-if="confirmandoAccion" class="btn-spinner"></span>
+                <span v-if="confirmandoAccion" class="btn-spinner" />
 
                 {{
                   confirmandoAccion
@@ -1370,7 +1611,10 @@ const fechasReprogramacionLista = (sol: SolicitudDirector | null | undefined) =>
       </Transition>
     </Teleport>
 
-    <!-- TOAST -->
+    <!-- =====================================================
+         TOAST
+         ===================================================== -->
+
     <Teleport to="body">
       <Transition name="toast">
         <div v-if="toastVisible" class="toast-success">
@@ -1397,6 +1641,10 @@ const fechasReprogramacionLista = (sol: SolicitudDirector | null | undefined) =>
 </template>
 
 <style scoped>
+/* =========================================================
+   GENERAL
+   ========================================================= */
+
 .solicitudes-page {
   display: flex;
   flex-direction: column;
@@ -1407,19 +1655,6 @@ const fechasReprogramacionLista = (sol: SolicitudDirector | null | undefined) =>
   display: flex;
   align-items: center;
   justify-content: space-between;
-}
-
-.page-title {
-  font-size: 22px;
-  font-weight: 700;
-  color: var(--color-text);
-  margin: 0 0 4px;
-}
-
-.page-subtitle {
-  font-size: 13px;
-  color: var(--color-text-muted);
-  margin: 0;
 }
 
 .pending-pill {
@@ -1452,6 +1687,10 @@ const fechasReprogramacionLista = (sol: SolicitudDirector | null | undefined) =>
     opacity: 0.4;
   }
 }
+
+/* =========================================================
+   TOOLBAR
+   ========================================================= */
 
 .toolbar {
   display: flex;
@@ -1543,6 +1782,10 @@ const fechasReprogramacionLista = (sol: SolicitudDirector | null | undefined) =>
   color: var(--color-text);
 }
 
+/* =========================================================
+   LOADING
+   ========================================================= */
+
 .loading-state {
   display: flex;
   align-items: center;
@@ -1553,15 +1796,24 @@ const fechasReprogramacionLista = (sol: SolicitudDirector | null | undefined) =>
   font-size: 13px;
 }
 
-.btn-spinner {
-  width: 13px;
-  height: 13px;
-  border: 2px solid rgba(255, 255, 255, 0.4);
-  border-top-color: white;
+.spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--color-border);
+  border-top-color: var(--color-primary);
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
-  flex-shrink: 0;
 }
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* =========================================================
+   CARD
+   ========================================================= */
 
 .card {
   background: var(--color-surface);
@@ -1675,6 +1927,10 @@ const fechasReprogramacionLista = (sol: SolicitudDirector | null | undefined) =>
   max-width: 400px;
 }
 
+/* =========================================================
+   ACTIONS
+   ========================================================= */
+
 .request-actions {
   display: flex;
   align-items: center;
@@ -1726,6 +1982,20 @@ const fechasReprogramacionLista = (sol: SolicitudDirector | null | undefined) =>
   color: white;
 }
 
+.action-btn.delete {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.action-btn.delete:hover {
+  background: #dc2626;
+  color: white;
+}
+
+/* =========================================================
+   STATUS
+   ========================================================= */
+
 .status-badge {
   padding: 3px 10px;
   border-radius: 20px;
@@ -1749,6 +2019,10 @@ const fechasReprogramacionLista = (sol: SolicitudDirector | null | undefined) =>
   color: #dc2626;
 }
 
+/* =========================================================
+   PAGINATION
+   ========================================================= */
+
 .pagination {
   display: flex;
   justify-content: space-between;
@@ -1758,6 +2032,15 @@ const fechasReprogramacionLista = (sol: SolicitudDirector | null | undefined) =>
 .pagination-info {
   font-size: 13px;
   color: var(--color-text-muted);
+}
+
+/* =========================================================
+   FORM
+   ========================================================= */
+
+.form-group {
+  display: flex;
+  flex-direction: column;
 }
 
 .motivo-textarea {
@@ -1791,30 +2074,75 @@ const fechasReprogramacionLista = (sol: SolicitudDirector | null | undefined) =>
   font-weight: 500;
 }
 
-.form-group {
-  display: flex;
-  flex-direction: column;
-}
-
-/* =========================================
-   OPCIONES DE REPROGRAMACIÓN
-   ========================================= */
+/* =========================================================
+   REPROGRAMACIÓN
+   ========================================================= */
 
 .repro-opciones {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  margin-top: 4px;
+  margin-top: 14px;
+}
+
+.repro-opciones-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.repro-required {
+  color: #dc2626;
+  font-size: 10px;
 }
 
 .repro-opcion {
+  width: 100%;
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 10px 14px;
+  padding: 12px 14px;
   border-radius: var(--radius);
   background: var(--color-background);
   border: 1px solid var(--color-border-light);
+  cursor: pointer;
+  text-align: left;
+  transition:
+    border-color var(--transition),
+    background var(--transition),
+    box-shadow var(--transition),
+    transform var(--transition);
+  color: inherit;
+}
+
+.repro-opcion:hover:not(:disabled) {
+  border-color: var(--color-accent);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.repro-opcion--elegida {
+  border-color: var(--color-success);
+  background: var(--color-success-bg);
+}
+
+.repro-opcion--disabled {
+  cursor: default;
+}
+
+.repro-opcion-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
 }
 
 .repro-opcion-num {
@@ -1832,24 +2160,45 @@ const fechasReprogramacionLista = (sol: SolicitudDirector | null | undefined) =>
   color: var(--color-text);
 }
 
-/* Opción seleccionada por el director/practicante */
-.repro-opcion--elegida {
-  border-color: var(--color-success);
-  background: var(--color-success-bg);
-  justify-content: space-between;
-}
-
 .repro-opcion-badge {
   margin-left: auto;
+  flex-shrink: 0;
   font-size: 11px;
   font-weight: 700;
   color: var(--color-success);
   background: white;
-  padding: 2px 8px;
+  padding: 3px 9px;
   border-radius: 999px;
 }
 
-/* Selector de fechas dentro del modal de aprobación */
+.repro-radio {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: var(--color-surface);
+  transition: all var(--transition);
+}
+
+.repro-radio.checked {
+  border-color: var(--color-success);
+}
+
+.repro-radio-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-success);
+}
+
+/* =========================================================
+   SELECTOR DEL MODAL DE APROBACIÓN
+   ========================================================= */
+
 .repro-opciones-select {
   display: flex;
   flex-direction: column;
@@ -1873,14 +2222,16 @@ const fechasReprogramacionLista = (sol: SolicitudDirector | null | undefined) =>
   background: var(--color-background);
   border: 1px solid var(--color-border-light);
   cursor: pointer;
-  transition: border-color var(--transition);
+  transition:
+    border-color var(--transition),
+    background var(--transition);
 }
 
 .repro-opcion-radio:hover {
   border-color: var(--color-text-muted);
 }
 
-.repro-opcion-radio:has(input:checked) {
+.repro-opcion-radio.selected {
   border-color: var(--color-accent);
   background: color-mix(
     in srgb,
@@ -1899,9 +2250,9 @@ const fechasReprogramacionLista = (sol: SolicitudDirector | null | undefined) =>
   gap: 12px;
 }
 
-/* =========================================
+/* =========================================================
    MODALES
-   ========================================= */
+   ========================================================= */
 
 .modal-overlay {
   position: fixed;
@@ -2013,9 +2364,9 @@ const fechasReprogramacionLista = (sol: SolicitudDirector | null | undefined) =>
   background: var(--color-surface);
 }
 
-/* =========================================
-   DETALLE
-   ========================================= */
+/* =========================================================
+   DETAIL
+   ========================================================= */
 
 .detail-hero {
   display: flex;
@@ -2095,10 +2446,6 @@ const fechasReprogramacionLista = (sol: SolicitudDirector | null | undefined) =>
   border-bottom: none;
 }
 
-.detail-section-icon {
-  display: none;
-}
-
 .detail-section-title {
   font-size: 13px;
   font-weight: 700;
@@ -2106,6 +2453,12 @@ const fechasReprogramacionLista = (sol: SolicitudDirector | null | undefined) =>
   margin: 0;
   text-transform: uppercase;
   letter-spacing: 0.4px;
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px 24px;
 }
 
 .detail-grid--2 {
@@ -2116,37 +2469,14 @@ const fechasReprogramacionLista = (sol: SolicitudDirector | null | undefined) =>
   grid-template-columns: repeat(3, 1fr);
 }
 
-.detail-item--wide {
-  grid-column: span 2;
-}
-
-.detail-value--highlight {
-  color: var(--color-accent);
-  font-weight: 600;
-}
-
-.detail-estado {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.detail-tipo {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--color-text);
-}
-
-.detail-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px 24px;
-}
-
 .detail-item {
   display: flex;
   flex-direction: column;
   gap: 6px;
+}
+
+.detail-item--wide {
+  grid-column: span 2;
 }
 
 .detail-item.full {
@@ -2168,6 +2498,11 @@ const fechasReprogramacionLista = (sol: SolicitudDirector | null | undefined) =>
   line-height: 1.4;
 }
 
+.detail-value--highlight {
+  color: var(--color-accent);
+  font-weight: 600;
+}
+
 .detail-text {
   font-size: 14px;
   color: var(--color-text);
@@ -2183,9 +2518,170 @@ const fechasReprogramacionLista = (sol: SolicitudDirector | null | undefined) =>
   font-style: italic;
 }
 
-/* =========================================
+/* =========================================================
+   PDF
+   ========================================================= */
+
+.pdf-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-accent);
+  background: var(--color-info-bg);
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  text-decoration: none;
+  width: fit-content;
+  transition: opacity var(--transition);
+}
+
+.pdf-link:hover {
+  opacity: 0.75;
+}
+
+/* =========================================================
+   BOTONES
+   ========================================================= */
+
+.confirm-text {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  margin: 0;
+  line-height: 1.6;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: var(--radius);
+  font-size: 13px;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.btn-ghost {
+  background: var(--color-background);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+}
+
+.btn-ghost:hover {
+  background: var(--color-border-light);
+}
+
+.btn-approve {
+  background: var(--color-success);
+  color: white;
+}
+
+.btn-approve:hover {
+  opacity: 0.9;
+}
+
+.btn-reject {
+  background: #dc2626;
+  color: white;
+}
+
+.btn-reject:hover {
+  background: #b91c1c;
+}
+
+.btn-spinner {
+  width: 13px;
+  height: 13px;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+/* =========================================================
+   TOAST
+   ========================================================= */
+
+.toast-success {
+  position: fixed;
+  bottom: 28px;
+  right: 28px;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #111827;
+  color: white;
+  padding: 14px 20px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 500;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+}
+
+.toast-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #10b981;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* =========================================================
+   TRANSITIONS
+   ========================================================= */
+
+.modal-enter-active,
+.modal-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.modal-enter-active .modal-card,
+.modal-leave-active .modal-card {
+  transition:
+    transform 0.2s ease,
+    opacity 0.2s ease;
+}
+
+.modal-enter-from,
+.modal-leave-to {
+  opacity: 0;
+}
+
+.modal-enter-from .modal-card,
+.modal-leave-to .modal-card {
+  transform: scale(0.95) translateY(8px);
+  opacity: 0;
+}
+
+.toast-enter-active,
+.toast-leave-active {
+  transition: all 0.3s ease;
+}
+
+.toast-enter-from,
+.toast-leave-to {
+  opacity: 0;
+  transform: translateY(12px) scale(0.95);
+}
+
+/* =========================================================
    RESPONSIVE
-   ========================================= */
+   ========================================================= */
 
 @media (max-width: 768px) {
   .toolbar {
@@ -2275,6 +2771,16 @@ const fechasReprogramacionLista = (sol: SolicitudDirector | null | undefined) =>
     align-items: flex-start;
   }
 
+  .repro-opcion-content {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+
+  .repro-opcion-num {
+    min-width: auto;
+  }
+
   .toast-success {
     left: 16px;
     right: 16px;
@@ -2308,156 +2814,15 @@ const fechasReprogramacionLista = (sol: SolicitudDirector | null | undefined) =>
   }
 
   .repro-opcion {
-    flex-direction: column;
     align-items: flex-start;
-    gap: 4px;
+  }
+
+  .repro-opcion-badge {
+    margin-left: auto;
   }
 
   .repro-opcion-radio-label {
     flex-wrap: wrap;
   }
-}
-
-/* =========================================
-   BOTONES Y TOAST
-   ========================================= */
-
-.confirm-text {
-  font-size: 13px;
-  color: var(--color-text-secondary);
-  margin: 0;
-  line-height: 1.6;
-}
-
-.btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 16px;
-  border-radius: var(--radius);
-  font-size: 13px;
-  font-weight: 500;
-  border: none;
-  cursor: pointer;
-  transition: all var(--transition);
-}
-
-.btn-ghost {
-  background: var(--color-background);
-  color: var(--color-text);
-  border: 1px solid var(--color-border);
-}
-
-.btn-ghost:hover {
-  background: var(--color-border-light);
-}
-
-.btn-approve {
-  background: var(--color-success);
-  color: white;
-}
-
-.btn-approve:hover {
-  opacity: 0.9;
-}
-
-.btn-reject {
-  background: #dc2626;
-  color: white;
-}
-
-.btn-reject:hover {
-  background: #b91c1c;
-}
-
-.toast-success {
-  position: fixed;
-  bottom: 28px;
-  right: 28px;
-  z-index: 2000;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  background: #111827;
-  color: white;
-  padding: 14px 20px;
-  border-radius: 12px;
-  font-size: 13px;
-  font-weight: 500;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
-}
-
-.toast-icon {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: #10b981;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.modal-enter-active,
-.modal-leave-active {
-  transition: opacity 0.2s ease;
-}
-
-.modal-enter-active .modal-card,
-.modal-leave-active .modal-card {
-  transition:
-    transform 0.2s ease,
-    opacity 0.2s ease;
-}
-
-.modal-enter-from,
-.modal-leave-to {
-  opacity: 0;
-}
-
-.modal-enter-from .modal-card,
-.modal-leave-to .modal-card {
-  transform: scale(0.95) translateY(8px);
-  opacity: 0;
-}
-
-.toast-enter-active,
-.toast-leave-active {
-  transition: all 0.3s ease;
-}
-
-.toast-enter-from,
-.toast-leave-to {
-  opacity: 0;
-  transform: translateY(12px) scale(0.95);
-}
-
-.pdf-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--color-accent);
-  background: var(--color-info-bg);
-  padding: 10px 14px;
-  border-radius: var(--radius);
-  text-decoration: none;
-  width: fit-content;
-  transition: opacity var(--transition);
-}
-
-.pdf-link:hover {
-  opacity: 0.75;
-}
-
-.action-btn.delete {
-  background: #fee2e2;
-  color: #dc2626;
-}
-
-.action-btn.delete:hover {
-  background: #dc2626;
-  color: white;
 }
 </style>
