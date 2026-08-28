@@ -167,23 +167,6 @@ async function notificarSuscritosAntesDeCambio(before, after, fuente) {
         fecha_creacion: FieldValue.serverTimestamp(),
       };
       await getFirestore().collection("notificaciones").add(notificacion);
-
-      const correo = String(data.correo_personal || "")
-        .trim()
-        .toLowerCase();
-      if (correo) {
-        await getFirestore()
-          .collection("mail")
-          .add({
-            to: correo,
-            message: {
-              subject: `Novedad en ${materia}`,
-              text: mensaje,
-            },
-            estudiante_id: data.estudiante_id,
-            creado_en: FieldValue.serverTimestamp(),
-          });
-      }
     }),
   );
 }
