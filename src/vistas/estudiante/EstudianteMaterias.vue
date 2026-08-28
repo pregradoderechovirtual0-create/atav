@@ -1,8 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import { doc, getDoc } from "firebase/firestore";
-import { auth, db } from "@/lib/firebase";
-import { obtenerSesion } from "@/lib/autenticacion/session";
+import { auth } from "@/lib/firebase";
 import {
   fetchMaterias,
   filtrarMaterias,
@@ -11,26 +9,20 @@ import {
 import {
   cancelarSuscripcion,
   cargarSuscripcionesMateria,
-  guardarCorreoPersonal,
   suscribirMateria,
   type SuscripcionMateria,
 } from "@/lib/dominio/suscripcionesMaterias";
 
 const materias = ref<MateriaRegistrada[]>([]);
 const suscripciones = ref<SuscripcionMateria[]>([]);
-const correoPersonal = ref("");
-const correoConfirmacion = ref("");
 const busqueda = ref("");
-const correoGuardado = ref(false);
 const cargando = ref(true);
 const guardando = ref<string | null>(null);
 const error = ref("");
 const mensaje = ref("");
-const cedula = ref("");
 
 const suscrita = (codigo: string) =>
   suscripciones.value.some((s) => s.materia_codigo === codigo);
-const tieneCorreo = computed(() => correoPersonal.value.trim().length > 0);
 const materiasDisponibles = computed(() =>
   filtrarMaterias(materias.value, busqueda.value),
 );
@@ -38,35 +30,11 @@ const materiasDisponibles = computed(() =>
 const cargar = async () => {
   const user = auth.currentUser;
   if (!user) return;
-  const sesion = await obtenerSesion();
-  cedula.value = sesion?.cedula || localStorage.getItem("cedula") || "";
-  try {
-    const perfil = cedula.value
-      ? await getDoc(doc(db, "usuarios", cedula.value))
-      : null;
-    correoPersonal.value = (perfil?.data()?.correo_personal || "")
-      .toString()
-      .trim();
-    correoGuardado.value = correoPersonal.value.length > 0;
-  } catch (error) {
-    console.warn(
-      "No se pudo cargar el correo personal; se solicitará al suscribirse:",
-      error,
-    );
-  }
-
   const catalogo = await fetchMaterias();
   materias.value = catalogo;
 
   try {
     suscripciones.value = await cargarSuscripcionesMateria(user.uid);
-    const correoDeSuscripcion = suscripciones.value
-      .find((suscripcion) => suscripcion.correo_personal?.trim())
-      ?.correo_personal?.trim();
-    if (!correoGuardado.value && correoDeSuscripcion) {
-      correoPersonal.value = correoDeSuscripcion;
-      correoGuardado.value = true;
-    }
   } catch (error) {
     console.warn("No se pudieron cargar las suscripciones existentes:", error);
   }
@@ -77,24 +45,6 @@ const alternar = async (materia: MateriaRegistrada) => {
   mensaje.value = "";
   const user = auth.currentUser;
   if (!user) return;
-  const primeraSuscripcion =
-    !correoGuardado.value && suscripciones.value.length === 0;
-  if (!suscrita(materia.codigo) && primeraSuscripcion && !tieneCorreo.value) {
-    error.value =
-      "Ingresa y confirma tu correo personal para recibir avisos de tus materias.";
-    return;
-  }
-  if (
-    !suscrita(materia.codigo) &&
-    primeraSuscripcion &&
-    tieneCorreo.value &&
-    correoPersonal.value.trim().toLowerCase() !==
-      correoConfirmacion.value.trim().toLowerCase()
-  ) {
-    error.value = "Los correos no coinciden.";
-    return;
-  }
-
   guardando.value = materia.codigo;
   try {
     if (suscrita(materia.codigo)) {
@@ -104,9 +54,7 @@ const alternar = async (materia: MateriaRegistrada) => {
       );
       mensaje.value = "Suscripción cancelada.";
     } else {
-      await guardarCorreoPersonal(cedula.value, correoPersonal.value);
-      await suscribirMateria(user.uid, materia, correoPersonal.value);
-      correoGuardado.value = true;
+      await suscribirMateria(user.uid, materia);
       suscripciones.value.push({
         id: "",
         estudiante_id: user.uid,
@@ -114,11 +62,9 @@ const alternar = async (materia: MateriaRegistrada) => {
         materia_label: `${materia.codigo} — ${materia.nombre}`,
         profesor: materia.profesor || "",
         semestre: materia.semestre || "",
-        correo_personal: correoPersonal.value,
       });
-      correoConfirmacion.value = "";
       mensaje.value =
-        "Materia suscrita. Recibirás avisos en ATAV y en tu correo personal.";
+        "Materia suscrita. Recibirás sus novedades dentro de ATAV.";
     }
   } catch (e) {
     error.value =
@@ -148,31 +94,6 @@ onMounted(async () => {
         <p>Elige las materias que estás viendo para recibir sus novedades.</p>
       </div>
     </header>
-    <section class="materias-contacto">
-      <strong>¿Cuál es tu correo electrónico personal?</strong>
-      <p v-if="correoGuardado">
-        Usaremos este correo en todas tus suscripciones.
-      </p>
-      <template v-else>
-        <p>
-          Solo te lo pediremos una vez, al suscribirte a tu primera materia.
-        </p>
-        <div class="correo-grid">
-          <input
-            v-model="correoPersonal"
-            type="email"
-            placeholder="tu-correo-personal@ejemplo.com"
-            aria-label="Correo personal"
-          />
-          <input
-            v-model="correoConfirmacion"
-            type="email"
-            placeholder="Confirma tu correo personal"
-            aria-label="Confirma tu correo personal"
-          />
-        </div>
-      </template>
-    </section>
     <p v-if="error" class="materias-alert materias-alert--error">{{ error }}</p>
     <p v-if="mensaje" class="materias-alert materias-alert--ok">
       {{ mensaje }}
