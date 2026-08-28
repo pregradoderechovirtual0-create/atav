@@ -1,7 +1,17 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref, computed } from 'vue'
 import { db } from '@/lib/firebase'
-import { updateDoc, doc, deleteDoc, arrayUnion, serverTimestamp } from 'firebase/firestore'
+import {
+  updateDoc,
+  doc,
+  deleteDoc,
+  arrayUnion,
+  serverTimestamp,
+  collection,
+  query,
+  where,
+  getDocs,
+} from 'firebase/firestore'
 import { crearNotificacion, rutaNotificacionEstudiante } from '@/lib/dominio/notificaciones'
 import {
   formatFechaParcial,
@@ -200,7 +210,73 @@ const estadoGuardar = nuevoEstado.toLowerCase()
         console.error('Error al crear la notificación:', error)
       }
     }
- 
+
+        // 4. Notificar estudiantes inscritos cuando se aprueba una inasistencia docente
+    if (
+      accionPendiente.value === 'aprobar' &&
+      solicitudAccion.value.tipo === 'inasistencia'
+    ) {
+
+      try {
+
+        const estudiantes = await getDocs(
+          query(
+            collection(db, 'suscripciones_materias'),
+            where(
+              'materia_codigo',
+              '==',
+              solicitudAccion.value.materia_codigo
+            )
+          )
+        )
+
+        crearNotificacion({
+ usuario_id: estudiante.estudiante_id,
+ titulo:'Cambio en la programación de clase',
+ mensaje:`El docente ...`,
+ tipo:'info',
+ ruta:'/estudiante/calendario'
+})
+
+
+        if (!estudiantes.empty) {
+
+          await Promise.all(
+            estudiantes.docs.map((docEstudiante) => {
+
+              const estudiante = docEstudiante.data()
+
+              return crearNotificacion({
+
+                usuario_id: estudiante.estudiante_id,
+
+                titulo: 'Cambio en la programación de clase',
+
+                mensaje:
+                  `El docente ${solicitudAccion.value.docente_nombre || ''} tiene una inasistencia aprobada para la materia ${solicitudAccion.value.materia}. Revisa ATAV para consultar la nueva programación.`,
+
+                tipo: 'info',
+
+                ruta: '/estudiante/calendario',
+
+              })
+
+            })
+          )
+
+        }
+
+      } catch (error) {
+
+        console.error(
+          'Error notificando estudiantes:',
+          error
+        )
+
+      }
+
+    }
+
     mostrarToast(`Solicitud ${nuevoEstado.toLowerCase()} correctamente`)
   } catch (e) {
     console.error(e)
