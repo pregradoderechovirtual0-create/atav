@@ -1,11 +1,12 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
-const { onDocumentWritten } = require("firebase-functions/v2/firestore");
 const { initializeApp } = require("firebase-admin/app");
 const { getAuth } = require("firebase-admin/auth");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const crypto = require("crypto");
 
 initializeApp();
+
+const db = getFirestore();
 
 const ROLES_AUTORIZADOS = new Set(["Director", "Jefa Suprema"]);
 
@@ -167,6 +168,23 @@ async function notificarSuscritosAntesDeCambio(before, after, fuente) {
         fecha_creacion: FieldValue.serverTimestamp(),
       };
       await getFirestore().collection("notificaciones").add(notificacion);
+
+      const correo = String(data.correo_personal || "")
+        .trim()
+        .toLowerCase();
+      if (correo) {
+        await getFirestore()
+          .collection("mail")
+          .add({
+            to: correo,
+            message: {
+              subject: `Novedad en ${materia}`,
+              text: mensaje,
+            },
+            estudiante_id: data.estudiante_id,
+            creado_en: FieldValue.serverTimestamp(),
+          });
+      }
     }),
   );
 }
