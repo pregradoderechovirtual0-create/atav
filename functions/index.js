@@ -7,6 +7,8 @@ const crypto = require("crypto");
 
 initializeApp();
 
+const db = getFirestore();
+
 const ROLES_AUTORIZADOS = new Set(["Director", "Jefa Suprema"]);
 
 function hashPassword(password) {
@@ -149,10 +151,29 @@ async function notificarSuscritosAntesDeCambio(before, after, fuente) {
   const materia = String(
     after.materia_label || after.materia || after.nombre || materiaCodigo,
   );
-  const mensaje =
-    fuente === "solicitud"
-      ? `Hay una actualización docente para ${materia}. Revisa la nueva fecha, estado o detalle en ATAV.`
-      : `Se actualizó un evento de ${materia}. Consulta el calendario de ATAV para ver los detalles.`;
+
+let mensaje;
+
+if (fuente === "solicitud") {
+
+  if (after.estado === "aprobada") {
+
+    mensaje =
+      `El docente ${after.docente_nombre || ""} tiene una inasistencia aprobada para ${materia}. Revisa ATAV para consultar la nueva programación.`;
+
+  } else {
+
+    mensaje =
+      `Hay una actualización docente para ${materia}. Revisa ATAV para ver los detalles.`;
+
+  }
+
+} else {
+
+  mensaje =
+    `Se actualizó un evento de ${materia}. Consulta el calendario de ATAV.`;
+
+}
 
   await Promise.all(
     suscripciones.docs.map(async (suscripcion) => {
