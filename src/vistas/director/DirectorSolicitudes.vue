@@ -66,6 +66,7 @@ const accionPendiente = ref<"aprobar" | "rechazar" | null>(null);
 const solicitudAccion = ref<any>(null);
 
 const motivoRechazo = ref("");
+const mensajeAprobacion = ref("");
 const errorMotivoRechazo = ref(false);
 const confirmandoAccion = ref(false);
 
@@ -275,6 +276,7 @@ const pedirConfirmacion = (sol: any, accion: "aprobar" | "rechazar") => {
   accionPendiente.value = accion;
 
   motivoRechazo.value = "";
+  mensajeAprobacion.value = "";
   errorMotivoRechazo.value = false;
   errorFechaRepro.value = false;
 
@@ -474,6 +476,10 @@ const confirmarAccion = async () => {
               fechaReproSeleccionada.value,
             )}.`;
           }
+
+          if (mensajeAprobacion.value.trim()) {
+            mensajeNotificacion += `\n\nMensaje adicional:\n${mensajeAprobacion.value.trim()}`;
+          }
         } else {
           mensajeNotificacion = `Tu solicitud de ${tipoSolicitud.toLowerCase()} para la materia ${solicitudAccion.value.materia} fue rechazada.\n\nMotivo: ${motivoRechazo.value}`;
         }
@@ -540,6 +546,7 @@ const confirmarAccion = async () => {
     accionPendiente.value = null;
 
     motivoRechazo.value = "";
+    mensajeAprobacion.value = "";
 
     errorMotivoRechazo.value = false;
     errorFechaRepro.value = false;
@@ -566,6 +573,7 @@ const cancelarAccion = () => {
   accionPendiente.value = null;
 
   motivoRechazo.value = "";
+  mensajeAprobacion.value = "";
 
   errorMotivoRechazo.value = false;
   errorFechaRepro.value = false;
@@ -1487,9 +1495,7 @@ const inicialesNombre = (nombre: string) => {
 
                 la solicitud de
 
-                <strong>
-                  {{ solicitudAccion?.nombre }} </strong
-                >?
+                <strong> {{ solicitudAccion?.nombre }} </strong>?
               </p>
 
               <!-- =================================================
@@ -1576,6 +1582,27 @@ const inicialesNombre = (nombre: string) => {
                 <p v-if="errorFechaRepro" class="motivo-error">
                   Debes seleccionar una de las fechas propuestas.
                 </p>
+              </div>
+
+              <div
+                v-if="
+                  accionPendiente === 'aprobar' &&
+                  solicitudAccion?.tipo === 'inasistencia'
+                "
+                class="form-group"
+              >
+                <label class="detail-label" for="mensaje-aprobacion">
+                  Mensaje para el docente
+                  <span class="optional-label"> (opcional) </span>
+                </label>
+
+                <textarea
+                  id="mensaje-aprobacion"
+                  v-model="mensajeAprobacion"
+                  class="motivo-textarea"
+                  rows="3"
+                  placeholder="Escribe un mensaje adicional para el docente..."
+                />
               </div>
             </div>
 
@@ -2072,6 +2099,13 @@ const inicialesNombre = (nombre: string) => {
   font-size: 12px;
   color: #dc2626;
   font-weight: 500;
+}
+
+.optional-label {
+  color: var(--color-text-muted);
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: normal;
 }
 
 /* =========================================================
