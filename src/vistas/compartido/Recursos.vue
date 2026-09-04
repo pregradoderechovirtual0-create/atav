@@ -163,7 +163,7 @@ onMounted(cargarDocumentos)
 
         <button
           class="btn btn-primary"
-          :disabled="subiendo || !formData.nombre.trim() || !formData.archivo"
+          :disabled="subiendo"
           @click="subirDocumento"
         >
           <span v-if="subiendo" class="btn-spinner"></span>
