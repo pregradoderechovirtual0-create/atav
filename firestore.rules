@@ -286,6 +286,11 @@ service cloud.firestore {
             && request.resource.data.ruta.matches('^/estudiante/')
             && request.resource.data.materia_codigo is string
             && exists(/databases/$(database)/documents/suscripciones_materias/$(request.resource.data.usuario_id + '_' + request.resource.data.materia_codigo)))
+          || (esDirector()
+            && request.resource.data.usuario_id != request.auth.uid
+            && request.resource.data.ruta.matches('^/estudiante/')
+            && request.resource.data.materia_codigo is string
+            && exists(/databases/$(database)/documents/suscripciones_materias/$(request.resource.data.usuario_id + '_' + request.resource.data.materia_codigo)))
         );
       allow delete: if esDirector();
     }
@@ -296,7 +301,8 @@ service cloud.firestore {
     }
 
     match /suscripciones_materias/{docId} {
-      allow read: if esDocente()
+      allow read: if esDirector()
+        || esDocente()
         || (isAuthenticated() && resource.data.estudiante_id == request.auth.uid);
       allow delete: if isAuthenticated() && resource.data.estudiante_id == request.auth.uid;
       allow create: if (

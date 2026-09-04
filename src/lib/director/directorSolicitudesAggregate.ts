@@ -21,6 +21,7 @@ export interface SolicitudDirector {
   estado: string;
   tipo: string;
   materia: string;
+  materia_codigo?: string;
   motivo: string;
   descripcion: string;
   cedula: string;
@@ -82,6 +83,7 @@ export function mapSnapSolicitudesDirector(
       estado: labelEstadoUI(String(data.estado || "creada")),
       tipo: "inasistencia",
       materia: String(data.materia_label || data.materia || "—"),
+      materia_codigo: String(data.materia_codigo || ""),
       motivo: String(data.descripcion || data.tipo_ausentismo || "—"),
       descripcion: String(data.descripcion || ""),
       usuario_id: data.usuario_id as string | undefined,

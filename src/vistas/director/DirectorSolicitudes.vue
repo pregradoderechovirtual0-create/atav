@@ -505,6 +505,9 @@ const confirmarAccion = async () => {
       solicitudAccion.value.tipo === "inasistencia"
     ) {
       try {
+        const docenteSolicitud = normalizarNombre(
+          solicitudAccion.value.docente_nombre || solicitudAccion.value.nombre,
+        );
         const estudiantes = await getDocs(
           query(
             collection(db, "suscripciones_materias"),
@@ -512,19 +515,29 @@ const confirmarAccion = async () => {
           ),
         );
 
-        if (!estudiantes.empty) {
-          await Promise.all(
-            estudiantes.docs.map((docEstudiante) => {
-              const estudiante = docEstudiante.data();
+        const estudiantesDeLaClase = estudiantes.docs.filter(
+          (docEstudiante: { data: () => Record<string, unknown> }) => {
+            const estudiante = docEstudiante.data();
+            return normalizarNombre(estudiante.profesor) === docenteSolicitud;
+          },
+        );
 
-              return crearNotificacion({
-                usuario_id: estudiante.estudiante_id,
-                titulo: "Cambio en la programación de clase",
-                mensaje: `El docente ${solicitudAccion.value.docente_nombre || ""} tiene una inasistencia aprobada para la materia ${solicitudAccion.value.materia}. Revisa ATAV para consultar la nueva programación.`,
-                tipo: "info",
-                ruta: "/estudiante/calendario",
-              });
-            }),
+        if (estudiantesDeLaClase.length) {
+          await Promise.all(
+            estudiantesDeLaClase.map(
+              (docEstudiante: { data: () => Record<string, unknown> }) => {
+                const estudiante = docEstudiante.data();
+
+                return crearNotificacion({
+                  usuario_id: estudiante.estudiante_id,
+                  titulo: "Cambio en la programación de clase",
+                  mensaje: `El docente ${solicitudAccion.value.docente_nombre || ""} tiene una inasistencia aprobada para la materia ${solicitudAccion.value.materia}. Revisa ATAV para consultar la nueva programación.`,
+                  tipo: "info",
+                  ruta: "/estudiante/calendario",
+                  materia_codigo: solicitudAccion.value.materia_codigo,
+                });
+              },
+            ),
           );
         }
       } catch (error) {
@@ -687,6 +700,13 @@ const inicialesNombre = (nombre: string) => {
     .join("")
     .toUpperCase();
 };
+
+const normalizarNombre = (nombre: unknown) =>
+  String(nombre || "")
+    .trim()
+    .toLocaleLowerCase("es-CO")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
 </script>
 
 <template>

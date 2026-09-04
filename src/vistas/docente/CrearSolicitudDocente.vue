@@ -4,10 +4,7 @@ import { useRouter } from "vue-router";
 import { auth, db } from "@/lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
-import {
-  notificarDirectores,
-  notificarEstudiantesSuscritos,
-} from "@/lib/dominio/notificaciones";
+import { notificarDirectores } from "@/lib/dominio/notificaciones";
 import {
   fetchMaterias,
   filtrarMateriasPorProfesor,
@@ -194,18 +191,6 @@ const enviar = async () => {
       fechas_reprogramacion: fechas,
       pdf_url: pdfUrl,
     });
-
-    try {
-      await notificarEstudiantesSuscritos(
-        formData.value.materiaCodigo,
-        `${docenteNombre.value || "El profesor"} registró una novedad para ${materia ? labelMateria(materia) : formData.value.materiaCodigo}. Revisa el calendario en ATAV.`,
-      );
-    } catch (notifError) {
-      console.error(
-        "Solicitud guardada; falló notificación a estudiantes:",
-        notifError,
-      );
-    }
 
     try {
       await notificarDirectores({
