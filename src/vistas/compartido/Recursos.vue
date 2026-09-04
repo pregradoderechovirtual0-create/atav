@@ -48,6 +48,8 @@ const cargarDocumentos = async () => {
 }
 
 const onPdfSelect = (file: File) => {
+  console.log("PDF recibido:", file)
+
   formData.value.archivo = file
   archivoNombre.value = file.name
 }
@@ -161,7 +163,7 @@ onMounted(cargarDocumentos)
 
         <button
           class="btn btn-primary"
-          :disabled="subiendo || !formData.nombre.trim() || !formData.archivo"
+          :disabled="subiendo"
           @click="subirDocumento"
         >
           <span v-if="subiendo" class="btn-spinner"></span>
