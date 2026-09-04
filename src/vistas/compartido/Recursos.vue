@@ -48,6 +48,8 @@ const cargarDocumentos = async () => {
 }
 
 const onPdfSelect = (file: File) => {
+  console.log("PDF recibido:", file)
+
   formData.value.archivo = file
   archivoNombre.value = file.name
 }
