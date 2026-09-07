@@ -49,6 +49,18 @@ const accionesRapidas = [
     color: "#0f766e",
     bg: "#f0fdfa",
   },
+
+  {
+  title: "Mis materias suscritas",
+  path: "/estudiante/mis-materias",
+  icon: "video",
+  name: "MisMaterias",
+  component: () =>
+    import(
+      "@/vistas/estudiante/MisMaterias.vue"
+    ),
+},
+
   {
     title: "Flexibilización",
     desc: "Cambio de fecha u hora de parcial",
@@ -172,20 +184,6 @@ const cargarParciales = async () => {
     guardarCacheParcialesProximos(proximosParciales.value);
   } catch (_) {
     proximosParciales.value = [];
-  }
-};
-
-const cargarMateriasOfertadas = async () => {
-  try {
-    const materias = await fetchMaterias();
-    materiasOfertadas.value = materias.filter((materia) =>
-      materia.profesor?.trim(),
-    );
-  } catch (error) {
-    console.error("Error cargando materias ofertadas:", error);
-    materiasOfertadas.value = [];
-  } finally {
-    cargandoMaterias.value = false;
   }
 };
 
@@ -398,55 +396,6 @@ const tipoColorParcial: Record<string, string> = {
       </router-link>
     </section>
 
-    <section class="card materias-ofertadas">
-      <div class="card-header">
-        <div>
-          <h2>Materias ofertadas</h2>
-          <p class="materias-ofertadas-subtitle">
-            encuentros disponibles con profesor asignado para este semestre
-          </p>
-        </div>
-        <router-link to="/estudiante/materias" class="ver-link">
-          Ver inscripción →
-        </router-link>
-      </div>
-
-      <div v-if="cargandoMaterias" class="materias-ofertadas-state">
-        Cargando materias ofertadas...
-      </div>
-      <div v-else-if="materiasOfertadas.length" class="materias-ofertadas-list">
-        <div
-          v-for="materia in materiasOfertadas"
-          :key="materia.id"
-          class="materia-ofertada-row"
-        >
-          <div class="materia-ofertada-info">
-            <strong>{{ materia.codigo }} — {{ materia.nombre }}</strong>
-            <span>
-              Profesor: {{ materia.profesor }} ·
-              {{
-                materia.semestre
-                  ? `Semestre ${materia.semestre}`
-                  : "Semestre no indicado"
-              }}
-            </span>
-          </div>
-          <router-link
-            to="/estudiante/materias"
-            class="materia-ofertada-action"
-          >
-            Suscribirme
-          </router-link>
-        </div>
-      </div>
-      <div v-else class="materias-ofertadas-state">
-        Aún no hay materias ofertadas con profesor asignado.
-        <router-link to="/director/materias" class="ver-link">
-          Publicar materias
-        </router-link>
-      </div>
-    </section>
-
     <section class="stats-grid">
       <div class="stat-card">
         <div class="stat-top">
@@ -588,7 +537,7 @@ const tipoColorParcial: Record<string, string> = {
 
 
   <div v-else class="materias-ofertadas-state">
-    No tienes materias suscritas actualmente.
+    No tienes materias suscritas actualmente.b
   </div>
 
 </section>
