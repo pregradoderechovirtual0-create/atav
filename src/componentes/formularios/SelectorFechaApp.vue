@@ -18,13 +18,35 @@ const props = defineProps<{
 
 const emit = defineEmits<{ 'update:modelValue': [string] }>()
 
+const obtenerFechaHoy = () => {
+  const ahora = new Date()
+
+  const año = ahora.getFullYear()
+  const mes = String(ahora.getMonth() + 1).padStart(2, '0')
+  const dia = String(ahora.getDate()).padStart(2, '0')
+
+  return `${año}-${mes}-${dia}`
+}
+
+const fechaMinima = computed(() => {
+  if (!props.min) return obtenerFechaHoy()
+
+  // Si min viene como datetime-local, tomamos solamente la fecha
+  return props.min.includes('T')
+    ? props.min.split('T')[0]
+    : props.min
+})
+
 const hoy = new Date()
+
 const calMes = ref(hoy.getMonth())
 const calAnio = ref(hoy.getFullYear())
 
 const irAMesDe = (iso: string) => {
   if (!iso) return
+
   const [y, m] = iso.split('-').map(Number)
+
   if (y && m) {
     calAnio.value = y
     calMes.value = m - 1
@@ -33,31 +55,56 @@ const irAMesDe = (iso: string) => {
 
 watch(
   () => props.modelValue,
-  (valor) => { if (valor) irAMesDe(valor) },
+  (valor) => {
+    if (valor) irAMesDe(valor)
+  },
   { immediate: true },
 )
 
 const diasCalendario = computed(() =>
-  construirDiasCalendario(calMes.value, calAnio.value, props.min, props.max),
+  construirDiasCalendario(
+    calMes.value,
+    calAnio.value,
+    fechaMinima.value,
+    props.max,
+  ),
 )
 
 const calAnterior = () => {
-  if (calMes.value === 0) { calMes.value = 11; calAnio.value-- } else calMes.value--
+  if (calMes.value === 0) {
+    calMes.value = 11
+    calAnio.value--
+  } else {
+    calMes.value--
+  }
 }
 
 const calSiguiente = () => {
-  if (calMes.value === 11) { calMes.value = 0; calAnio.value++ } else calMes.value++
+  if (calMes.value === 11) {
+    calMes.value = 0
+    calAnio.value++
+  } else {
+    calMes.value++
+  }
 }
 
 const celdaDisponible = (celda: CeldaCalendario | null) =>
-  !!celda && esDiaHabilitado(celda.iso, props.min, props.max)
+  !!celda &&
+  esDiaHabilitado(
+    celda.iso,
+    fechaMinima.value,
+    props.max,
+  )
 
 const seleccionarDia = (celda: CeldaCalendario | null) => {
   if (!celdaDisponible(celda)) return
+
   emit('update:modelValue', celda!.iso)
 }
 
-const limpiar = () => emit('update:modelValue', '')
+const limpiar = () => {
+  emit('update:modelValue', '')
+}
 </script>
 
 <template>

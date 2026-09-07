@@ -20,40 +20,112 @@ const props = defineProps<{
 
 const emit = defineEmits<{ 'update:modelValue': [string] }>()
 
+/* =========================================================
+   FECHA Y HORA ACTUAL
+   ========================================================= */
+
+const obtenerFechaHoy = () => {
+  const ahora = new Date()
+
+  const año = ahora.getFullYear()
+  const mes = String(ahora.getMonth() + 1).padStart(2, '0')
+  const dia = String(ahora.getDate()).padStart(2, '0')
+
+  return `${año}-${mes}-${dia}`
+}
+
+const obtenerHoraActual = () => {
+  const ahora = new Date()
+
+  const hora = String(ahora.getHours()).padStart(2, '0')
+  const minuto = String(ahora.getMinutes()).padStart(2, '0')
+
+  return `${hora}:${minuto}`
+}
+
+/*
+ * Si props.min existe, se respeta.
+ * Si no existe, se utiliza hoy como fecha mínima.
+ */
+const fechaMinima = computed(() => {
+  if (!props.min) {
+    return obtenerFechaHoy()
+  }
+
+  return props.min.includes('T')
+    ? props.min.split('T')[0]
+    : props.min
+})
+
+/* =========================================================
+   CALENDARIO
+   ========================================================= */
+
 const hoy = new Date()
+
 const calMes = ref(hoy.getMonth())
 const calAnio = ref(hoy.getFullYear())
 
 const fechaSel = ref('')
 const horaSel = ref('')
 
-const horasOpciones = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'))
-const minutosOpciones = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, '0'))
+/* =========================================================
+   OPCIONES DE HORA
+   ========================================================= */
+
+const horasOpciones = Array.from(
+  { length: 24 },
+  (_, i) => String(i).padStart(2, '0'),
+)
+
+const minutosOpciones = Array.from(
+  { length: 60 },
+  (_, i) => String(i).padStart(2, '0'),
+)
+
+/* =========================================================
+   HORA SELECCIONADA
+   ========================================================= */
 
 const horaParte = computed({
   get: () => horaSel.value.split(':')[0] || '08',
+
   set: (h: string) => {
     const m = horaSel.value.split(':')[1] || '00'
-    horaSel.value = `${h.padStart(2, '0').slice(-2)}:${m}`
+
+    horaSel.value =
+      `${h.padStart(2, '0').slice(-2)}:${m}`
+
     emitirValor()
   },
 })
 
 const minutoParte = computed({
   get: () => horaSel.value.split(':')[1] || '00',
+
   set: (m: string) => {
     const h = horaSel.value.split(':')[0] || '08'
-    horaSel.value = `${h}:${m.padStart(2, '0').slice(-2)}`
+
+    horaSel.value =
+      `${h}:${m.padStart(2, '0').slice(-2)}`
+
     emitirValor()
   },
 })
 
+/* =========================================================
+   SINCRONIZAR MODEL VALUE
+   ========================================================= */
+
 const sincronizarDesdeModel = (valor: string) => {
   const { fecha, hora } = parseDatetimeLocal(valor)
+
   fechaSel.value = fecha
   horaSel.value = hora || '08:00'
+
   if (fecha) {
     const [y, m] = fecha.split('-').map(Number)
+
     if (y && m) {
       calAnio.value = y
       calMes.value = m - 1
@@ -61,41 +133,253 @@ const sincronizarDesdeModel = (valor: string) => {
   }
 }
 
-watch(() => props.modelValue, sincronizarDesdeModel, { immediate: true })
+watch(
+  () => props.modelValue,
+  sincronizarDesdeModel,
+  { immediate: true },
+)
+
+/* =========================================================
+   CALENDARIO
+   ========================================================= */
 
 const diasCalendario = computed(() =>
-  construirDiasCalendario(calMes.value, calAnio.value, props.min, props.max),
+  construirDiasCalendario(
+    calMes.value,
+    calAnio.value,
+    fechaMinima.value,
+    props.max,
+  ),
 )
 
 const calAnterior = () => {
-  if (calMes.value === 0) { calMes.value = 11; calAnio.value-- } else calMes.value--
+  if (calMes.value === 0) {
+    calMes.value = 11
+    calAnio.value--
+  } else {
+    calMes.value--
+  }
 }
 
 const calSiguiente = () => {
-  if (calMes.value === 11) { calMes.value = 0; calAnio.value++ } else calMes.value++
+  if (calMes.value === 11) {
+    calMes.value = 0
+    calAnio.value++
+  } else {
+    calMes.value++
+  }
 }
 
-const celdaDisponible = (celda: CeldaCalendario | null) =>
-  !!celda && esDiaHabilitado(celda.iso, props.min, props.max)
+const celdaDisponible = (
+  celda: CeldaCalendario | null,
+) =>
+  !!celda &&
+  esDiaHabilitado(
+    celda.iso,
+    fechaMinima.value,
+    props.max,
+  )
+
+/* =========================================================
+   VALIDAR HORA
+   ========================================================= */
+
+const horaEsValida = (hora: string) => {
+  if (!fechaSel.value || !hora) return false
+
+  const fechaHoy = obtenerFechaHoy()
+
+  /*
+   * Si la fecha seleccionada no es hoy,
+   * cualquier hora es válida.
+   */
+  if (fechaSel.value !== fechaHoy) {
+    return true
+  }
+
+  /*
+   * Si es hoy, la hora debe ser posterior
+   * a la hora actual.
+   */
+  const horaActual = obtenerHoraActual()
+
+  return hora >= horaActual
+}
+
+/* =========================================================
+   HORAS DISPONIBLES
+   ========================================================= */
+
+const horasDisponibles = computed(() => {
+  /*
+   * Si no hemos seleccionado fecha,
+   * mostramos todas las horas.
+   */
+  if (!fechaSel.value) {
+    return horasOpciones
+  }
+
+  const fechaHoy = obtenerFechaHoy()
+
+  /*
+   * Si es una fecha futura,
+   * todas las horas están disponibles.
+   */
+  if (fechaSel.value !== fechaHoy) {
+    return horasOpciones
+  }
+
+  /*
+   * Si es hoy, eliminamos las horas que ya pasaron.
+   */
+  const horaActual = Number(
+    obtenerHoraActual().split(':')[0],
+  )
+
+  return horasOpciones.filter(
+    (hora) => Number(hora) >= horaActual,
+  )
+})
+
+/* =========================================================
+   MINUTOS DISPONIBLES
+   ========================================================= */
+
+const minutosDisponibles = computed(() => {
+  if (!fechaSel.value) {
+    return minutosOpciones
+  }
+
+  const fechaHoy = obtenerFechaHoy()
+
+  if (fechaSel.value !== fechaHoy) {
+    return minutosOpciones
+  }
+
+  const [horaActual, minutoActual] =
+    obtenerHoraActual().split(':').map(Number)
+
+  const horaSeleccionada =
+    Number(horaSel.value.split(':')[0] || 0)
+
+  /*
+   * Si la hora seleccionada es posterior
+   * a la hora actual, todos los minutos sirven.
+   */
+  if (horaSeleccionada > horaActual) {
+    return minutosOpciones
+  }
+
+  /*
+   * Si estamos en la hora actual,
+   * solamente permitimos minutos futuros.
+   */
+  if (horaSeleccionada === horaActual) {
+    return minutosOpciones.filter(
+      (minuto) => Number(minuto) >= minutoActual,
+    )
+  }
+
+  /*
+   * Una hora pasada no debería ser posible.
+   */
+  return []
+})
+
+/* =========================================================
+   EMITIR VALOR
+   ========================================================= */
 
 const emitirValor = () => {
   if (!fechaSel.value || !horaSel.value) {
     emit('update:modelValue', '')
     return
   }
-  emit('update:modelValue', toDatetimeLocal(fechaSel.value, horaSel.value))
+
+  /*
+   * Evitar emitir una hora pasada.
+   */
+  if (!horaEsValida(horaSel.value)) {
+    return
+  }
+
+  emit(
+    'update:modelValue',
+    toDatetimeLocal(
+      fechaSel.value,
+      horaSel.value,
+    ),
+  )
 }
 
-const seleccionarDia = (celda: CeldaCalendario | null) => {
+/* =========================================================
+   SELECCIONAR DÍA
+   ========================================================= */
+
+const seleccionarDia = (
+  celda: CeldaCalendario | null,
+) => {
   if (!celdaDisponible(celda)) return
+
   fechaSel.value = celda!.iso
-  if (!horaSel.value) horaSel.value = '08:00'
+
+  /*
+   * Si seleccionamos hoy, comprobamos la hora.
+   */
+  if (fechaSel.value === obtenerFechaHoy()) {
+    const horaActual = obtenerHoraActual()
+
+    /*
+     * Si no existe hora o la hora actual
+     * ya pasó, usamos la siguiente hora disponible.
+     */
+    if (!horaSel.value || !horaEsValida(horaSel.value)) {
+      const [hora, minuto] = horaActual
+        .split(':')
+        .map(Number)
+
+      let nuevaHora = hora
+      let nuevoMinuto = minuto
+
+      /*
+       * Para evitar problemas con el minuto exacto,
+       * podemos avanzar un minuto.
+       */
+      nuevoMinuto++
+
+      if (nuevoMinuto >= 60) {
+        nuevaHora++
+        nuevoMinuto = 0
+      }
+
+      if (nuevaHora >= 24) {
+        /*
+         * Si ya no queda tiempo hoy,
+         * no seleccionamos una hora inválida.
+         */
+        horaSel.value = '23:59'
+      } else {
+        horaSel.value =
+          `${String(nuevaHora).padStart(2, '0')}:${String(nuevoMinuto).padStart(2, '0')}`
+      }
+    }
+  }
+
+  if (!horaSel.value) {
+    horaSel.value = '08:00'
+  }
+
   emitirValor()
 }
+
+/* =========================================================
+   LIMPIAR
+   ========================================================= */
 
 const limpiar = () => {
   fechaSel.value = ''
   horaSel.value = ''
+
   emit('update:modelValue', '')
 }
 </script>
