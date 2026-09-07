@@ -24,6 +24,10 @@ import {
 import { primerosDosNombres } from "@/lib/nucleo/nombreCorto";
 import { useRefreshOnVisible } from "@/composables/useRefreshOnVisible";
 import { fetchMaterias, type MateriaRegistrada } from "@/lib/dominio/materias";
+import {
+  cargarSuscripcionesMateria,
+  type SuscripcionMateria,
+} from "@/lib/dominio/suscripcionesMaterias";
 
 const nombreEstudiante = ref(leerNombreLocal());
 
@@ -33,11 +37,13 @@ const proximosParciales = ref<any[]>(leerCacheParcialesProximos() ?? []);
 const cargando = ref(solicitudes.value.length === 0);
 const materiasOfertadas = ref<MateriaRegistrada[]>([]);
 const cargandoMaterias = ref(true);
+const materiasSuscritas = ref<SuscripcionMateria[]>([]);
+const cargandoSuscritas = ref(true);
 
 const accionesRapidas = [
   {
     title: "Inscribirme a materias",
-    desc: "Selecciona tus clases del semestre actual",
+    desc: "Selecciona tus encuentros del semestre actual",
     path: "/estudiante/materias",
     icon: "book",
     color: "#0f766e",
@@ -68,6 +74,21 @@ const accionesRapidas = [
     bg: "#fffbeb",
   },
 ];
+
+const cargarMateriasSuscritas = async (uid:string) => {
+  try {
+    materiasSuscritas.value =
+      await cargarSuscripcionesMateria(uid);
+  } catch(error){
+    console.error(
+      "Error cargando materias suscritas:",
+      error
+    );
+    materiasSuscritas.value = [];
+  } finally {
+    cargandoSuscritas.value = false;
+  }
+};
 
 const horaDelDia = computed(() => {
   const h = new Date().getHours();
@@ -206,6 +227,7 @@ onMounted(async () => {
     cargarMateriasOfertadas();
     aplicarCacheDashboard(uid);
     precargarCachesSolicitudesEstudiante(uid);
+    cargarMateriasSuscritas(uid);
   }
 
   const sesion = await obtenerSesion();
@@ -381,7 +403,7 @@ const tipoColorParcial: Record<string, string> = {
         <div>
           <h2>Materias ofertadas</h2>
           <p class="materias-ofertadas-subtitle">
-            Clases disponibles con profesor asignado para este semestre
+            encuentros disponibles con profesor asignado para este semestre
           </p>
         </div>
         <router-link to="/estudiante/materias" class="ver-link">
@@ -507,6 +529,69 @@ const tipoColorParcial: Record<string, string> = {
         <p class="stat-label">Rechazadas</p>
       </div>
     </section>
+
+    <section class="card materias-suscritas">
+
+  <div class="card-header">
+    <div>
+      <h2>Mis materias suscritas</h2>
+      <p class="materias-ofertadas-subtitle">
+        Accede a tus encuentros virtuales del semestre
+      </p>
+    </div>
+  </div>
+
+
+  <div v-if="cargandoSuscritas"
+       class="materias-ofertadas-state">
+    Cargando materias...
+  </div>
+
+
+  <div 
+    v-else-if="materiasSuscritas.length"
+    class="materias-ofertadas-list"
+  >
+
+    <div
+      v-for="materia in materiasSuscritas"
+      :key="materia.materia_codigo"
+      class="materia-ofertada-row"
+    >
+
+      <div class="materia-ofertada-info">
+
+        <strong>
+          {{ materia.materia_label }}
+        </strong>
+
+        <span>
+          Profesor:
+          {{ materia.profesor || 'Sin asignar' }}
+          ·
+          {{ materia.semestre || 'Semestre no indicado' }}
+        </span>
+
+      </div>
+
+
+      <button
+        class="materia-ofertada-action"
+      >
+        Ingresar reunión
+      </button>
+
+
+    </div>
+
+  </div>
+
+
+  <div v-else class="materias-ofertadas-state">
+    No tienes materias suscritas actualmente.
+  </div>
+
+</section>
 
     <div class="info-bar">
       <div class="info-icon">
