@@ -23,7 +23,6 @@ import {
 } from "@/lib/solicitudes/dashboardSolicitudes";
 import { primerosDosNombres } from "@/lib/nucleo/nombreCorto";
 import { useRefreshOnVisible } from "@/composables/useRefreshOnVisible";
-import { fetchMaterias, type MateriaRegistrada } from "@/lib/dominio/materias";
 import {
   cargarSuscripcionesMateria,
   type SuscripcionMateria,
@@ -35,8 +34,6 @@ const nombreSaludo = computed(() => primerosDosNombres(nombreEstudiante.value));
 const solicitudes = ref<DashboardSolicitud[]>([]);
 const proximosParciales = ref<any[]>(leerCacheParcialesProximos() ?? []);
 const cargando = ref(solicitudes.value.length === 0);
-const materiasOfertadas = ref<MateriaRegistrada[]>([]);
-const cargandoMaterias = ref(true);
 const materiasSuscritas = ref<SuscripcionMateria[]>([]);
 const cargandoSuscritas = ref(true);
 
@@ -50,15 +47,13 @@ const accionesRapidas = [
     bg: "#f0fdfa",
   },
 
-  {
+{
   title: "Mis materias suscritas",
+  desc: "Accede a tus encuentros virtuales",
   path: "/estudiante/mis-materias",
   icon: "video",
-  name: "MisMaterias",
-  component: () =>
-    import(
-      "@/vistas/estudiante/MisMaterias.vue"
-    ),
+  color: "#0f766e",
+  bg: "#f0fdfa",
 },
 
   {
@@ -219,15 +214,6 @@ const cargarSolicitudes = async (uid: string) => {
 onMounted(async () => {
   if (!nombreEstudiante.value) nombreEstudiante.value = leerNombreLocal();
 
-  await esperarAuth();
-  const uid = auth.currentUser?.uid;
-  if (uid) {
-    cargarMateriasOfertadas();
-    aplicarCacheDashboard(uid);
-    precargarCachesSolicitudesEstudiante(uid);
-    cargarMateriasSuscritas(uid);
-  }
-
   const sesion = await obtenerSesion();
   if (sesion?.nombre?.trim()) nombreEstudiante.value = sesion.nombre.trim();
 
@@ -236,6 +222,8 @@ onMounted(async () => {
       aplicarCacheDashboard(user.uid);
       precargarCachesSolicitudesEstudiante(user.uid);
       cargarSolicitudes(user.uid);
+      cargarMateriasSuscritas(user.uid);
+
     } else cargando.value = false;
   });
 });
@@ -481,34 +469,22 @@ const tipoColorParcial: Record<string, string> = {
 
     <section class="card materias-suscritas">
 
-  <div class="card-header">
-    <div>
-      <h2>Mis materias suscritas</h2>
-      <p class="materias-ofertadas-subtitle">
-        Accede a tus encuentros virtuales del semestre
-      </p>
-    </div>
+<div class="card-header">
+  <div>
+    <h2>Mis materias suscritas</h2>
+    <p class="materias-subtitle">
+      Accede a tus encuentros virtuales del semestre
+    </p>
   </div>
-
-
-  <div v-if="cargandoSuscritas"
-       class="materias-ofertadas-state">
-    Cargando materias...
-  </div>
-
-
-  <div 
-    v-else-if="materiasSuscritas.length"
-    class="materias-ofertadas-list"
-  >
+</div>
 
     <div
       v-for="materia in materiasSuscritas"
       :key="materia.materia_codigo"
-      class="materia-ofertada-row"
+      class="materia-suscrita-row"
     >
 
-      <div class="materia-ofertada-info">
+      <div class="materia-suscrita-info">
 
         <strong>
           {{ materia.materia_label }}
@@ -525,20 +501,13 @@ const tipoColorParcial: Record<string, string> = {
 
 
       <button
-        class="materia-ofertada-action"
+        class="materia-suscrita-action"
       >
         Ingresar reunión
       </button>
 
 
     </div>
-
-  </div>
-
-
-  <div v-else class="materias-ofertadas-state">
-    No tienes materias suscritas actualmente.b
-  </div>
 
 </section>
 
@@ -1137,75 +1106,6 @@ const tipoColorParcial: Record<string, string> = {
   min-height: 280px;
 }
 
-.materias-ofertadas {
-  margin-top: 20px;
-}
-
-.materias-ofertadas-subtitle {
-  margin: 5px 0 0;
-  color: var(--color-text-muted);
-  font-size: 12px;
-}
-
-.materias-ofertadas-list {
-  display: grid;
-}
-
-.materia-ofertada-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 14px 20px;
-  border-bottom: 1px solid var(--color-border-light);
-}
-
-.materia-ofertada-row:last-child {
-  border-bottom: 0;
-}
-
-.materia-ofertada-info {
-  display: grid;
-  gap: 4px;
-  min-width: 0;
-}
-
-.materia-ofertada-info strong {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.materia-ofertada-info span,
-.materias-ofertadas-state {
-  color: var(--color-text-muted);
-  font-size: 12px;
-}
-
-.materias-ofertadas-state {
-  padding: 18px 20px;
-}
-
-.materias-ofertadas-state .ver-link {
-  margin-left: 6px;
-}
-
-.materia-ofertada-action {
-  flex-shrink: 0;
-  padding: 8px 12px;
-  border: 1px solid var(--color-accent);
-  border-radius: var(--radius);
-  color: var(--color-accent);
-  font-size: 12px;
-  font-weight: 600;
-  text-decoration: none;
-}
-
-.materia-ofertada-action:hover {
-  background: var(--color-accent);
-  color: white;
-}
-
 .card-header {
   display: flex;
   align-items: center;
@@ -1540,7 +1440,7 @@ const tipoColorParcial: Record<string, string> = {
     grid-template-columns: repeat(2, 1fr);
     gap: 12px;
   }
-  .materia-ofertada-row {
+  .materia-suscrita-row {
     align-items: flex-start;
     flex-direction: column;
   }
