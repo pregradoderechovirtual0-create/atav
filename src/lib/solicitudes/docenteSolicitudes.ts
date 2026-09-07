@@ -50,6 +50,21 @@ export const TIPOS_AUSENTISMO = [
     description: 'Actividades laborales institucionales',
   },
   {
+    id: 'incapacidad',
+    label: 'Incapacidad Medica',
+    description: 'Situacion de reposo',
+  },
+  {
+    id: 'movilidad',
+    label: 'Movilidad Academica',
+    description: 'Largas distancias a recorrer para asistir',
+  },
+  {
+    id: 'maternidad',
+    label: 'Licencia de Maternidad',
+    description: 'Plantilla',
+  },
+  {
     id: 'otro',
     label: 'Otro',
     description: 'Otros motivos justificados',
@@ -65,10 +80,10 @@ export const TIPOS_REPROGRAMACION = [
       'Continuar o ampliar el encuentro académico en otra fecha u horario',
   },
   {
-    id: 'virtual',
-    label: 'Encuentro virtual',
+    id: 'sincronico',
+    label: 'Encuentro Sincronico',
     description:
-      'Realizar el encuentro mediante modalidad virtual',
+      'Encuentro en vivo desde la plataforma Teams',
   },
   {
     id: 'grabada',
