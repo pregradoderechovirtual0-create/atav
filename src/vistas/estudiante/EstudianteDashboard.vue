@@ -50,7 +50,7 @@ const accionesRapidas = [
 {
   title: "Mis materias suscritas",
   desc: "Accede a tus encuentros virtuales",
-  path: "/estudiante/mis-materias",
+  path: "/estudiante/mis-encuentros",
   icon: "video",
   color: "#0f766e",
   bg: "#f0fdfa",
@@ -477,11 +477,20 @@ const tipoColorParcial: Record<string, string> = {
     </div>
   </div>
 
-  <div
-    v-for="materia in materiasSuscritas"
-    :key="materia.materia_codigo"
-    class="materia-suscrita-row"
-  >
+<div v-if="cargandoSuscritas">
+  Cargando encuentros...
+</div>
+
+<div v-else-if="materiasSuscritas.length === 0">
+  No tienes materias suscritas.
+</div>
+
+<div
+ v-else
+ v-for="materia in materiasSuscritas"
+ :key="materia.materia_codigo"
+ class="materia-suscrita-row"
+>
 
     <div class="materia-suscrita-info">
 
@@ -503,9 +512,12 @@ const tipoColorParcial: Record<string, string> = {
     </div>
 
 
-    <button class="materia-reunion-btn">
-      Ingresar reunión
-    </button>
+<button
+  class="materia-reunion-btn"
+  @click="abrirReunion(materia)"
+>
+  Ingresar reunión
+</button>
 
   </div>
 </section>
