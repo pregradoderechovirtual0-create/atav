@@ -235,7 +235,7 @@ const guardarMateria = async () => {
   profesor,
   enlace_reunion
 })
-      materias.value.push({ id: codigo, codigo, nombre, semestre, dia, hora, profesor })
+      materias.value.push({ id: codigo, codigo, nombre, semestre, dia, hora, profesor, enlace_reunion })
     } else {
       await updateDoc(
  doc(db, 'materias', materiaEditando.value.id),
@@ -389,7 +389,7 @@ const importarArchivo = async (event: Event) => {
       profesor,
       enlace_reunion
 })
-      materias.value.push({ id: codigo, codigo, nombre, semestre, dia, hora, profesor })
+      materias.value.push({ id: codigo, codigo, nombre, semestre, dia, hora, profesor, enlace_reunion })
       creados++
     } catch (e) {
       console.error(`Error con código ${codigo}:`, e)
@@ -682,6 +682,19 @@ const importarArchivo = async (event: Event) => {
               </section>
             </div>
 
+            <div class="field-group field-group-full">
+
+  <label class="field-label">
+    Enlace reunión virtual
+  </label>
+
+  <input
+    v-model="formMateria.enlace_reunion"
+    class="field-input"
+    placeholder="https://meet.google.com/..."
+  />
+
+</div>
             <div class="modal-footer modal-footer-actions">
               <button type="button" class="btn btn-secondary" @click="cerrarModal">Cancelar</button>
               <button type="button" class="btn btn-primary" @click="guardarMateria">
@@ -809,6 +822,7 @@ const importarArchivo = async (event: Event) => {
       </Transition>
     </Teleport>
   </div>
+
 </template>
 
 <style scoped>
