@@ -20,13 +20,15 @@ const paginaActual = ref(1)
 const modalVisible = ref(false)
 const modalModo = ref<'crear' | 'editar'>('crear')
 const materiaEditando = ref<any>(null)
+
 const formMateria = ref({
   codigo: '',
   nombre: '',
   semestre: '',
   dia: '',
   hora: '',
-  profesor: ''
+  profesor: '',
+  enlace_reunion: ''
 })
 
 // Modal confirmar eliminación
@@ -48,6 +50,12 @@ const verDetalleMateria = (materia: any) => {
     { key: 'dia', label: 'Día' },
     { key: 'hora', label: 'Hora' },
     { key: 'profesor', label: 'Profesor' },
+
+    { 
+ key:'enlace_reunion',
+ label:'Enlace reunión'
+}
+
   ])
   detalleVisible.value = true
 }
@@ -174,7 +182,7 @@ const irPagina = (pagina: number) => {
 // --- Crear ---
 const abrirModalCrear = () => {
   modalModo.value = 'crear'
-  formMateria.value = { codigo: '', nombre: '', semestre: '', dia: '', hora: '', profesor: '' }
+  formMateria.value = { codigo: '', nombre: '', semestre: '', dia: '', hora: '', profesor: '',  enlace_reunion: '' }
   modalVisible.value = true
 }
 
@@ -189,6 +197,7 @@ const abrirModalEditar = (materia: any) => {
     dia: materia.dia,
     hora: materia.hora,
     profesor: materia.profesor,
+    enlace_reunion: materia.enlace_reunion || ''
   }
   modalVisible.value = true
 }
@@ -199,7 +208,15 @@ const cerrarModal = () => {
 }
 
 const guardarMateria = async () => {
-  const { codigo, nombre, semestre, dia, hora, profesor } = formMateria.value
+  const { 
+  codigo, 
+  nombre, 
+  semestre, 
+  dia, 
+  hora, 
+  profesor,
+  enlace_reunion
+} = formMateria.value
   if (!codigo || !nombre || !semestre || !dia || !hora || !profesor) return
 
   try {
@@ -209,16 +226,36 @@ const guardarMateria = async () => {
         await dialog.alert(`Ya existe una materia con el código "${codigo}"`, { variant: 'error' })
         return
       }
-      await setDoc(doc(db, 'materias', codigo), { codigo, nombre, semestre, dia, hora, profesor })
+      await setDoc(doc(db, 'materias', codigo), { 
+  codigo,
+  nombre,
+  semestre,
+  dia,
+  hora,
+  profesor,
+  enlace_reunion
+})
       materias.value.push({ id: codigo, codigo, nombre, semestre, dia, hora, profesor })
     } else {
-      await updateDoc(doc(db, 'materias', materiaEditando.value.id), { codigo, nombre, semestre, dia, hora, profesor })
+      await updateDoc(
+ doc(db, 'materias', materiaEditando.value.id),
+ { 
+   codigo, 
+   nombre, 
+   semestre, 
+   dia, 
+   hora, 
+   profesor,
+   enlace_reunion
+ }
+)
       materiaEditando.value.codigo = codigo
       materiaEditando.value.nombre = nombre
       materiaEditando.value.semestre = semestre
       materiaEditando.value.dia = dia
       materiaEditando.value.hora = hora
       materiaEditando.value.profesor = profesor
+      materiaEditando.value.enlace_reunion = enlace_reunion
     }
     cerrarModal()
     mostrarToastGuardado()
@@ -340,9 +377,18 @@ const importarArchivo = async (event: Event) => {
     const dia = fila['dia'].toString().trim()
     const hora = fila['hora'].toString().trim()
     const profesor = fila['profesor'].toString().trim()
+    const enlace_reunion = fila['enlace_reunion']?.toString().trim() || ''
 
     try {
-      await setDoc(doc(db, 'materias', codigo), { codigo, nombre, semestre, dia, hora, profesor })
+      await setDoc(doc(db, 'materias', codigo), {
+      codigo,
+      nombre,
+      semestre,
+      dia,
+      hora,
+      profesor,
+      enlace_reunion
+})
       materias.value.push({ id: codigo, codigo, nombre, semestre, dia, hora, profesor })
       creados++
     } catch (e) {
