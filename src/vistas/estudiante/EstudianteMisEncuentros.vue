@@ -10,6 +10,9 @@ const materias = ref<SuscripcionMateria[]>([]);
 const cargando = ref(true);
 const error = ref("");
 
+const mostrarAviso = ref(false);
+const mensajeAviso = ref("");
+
 const cargarMaterias = async () => {
   const user = auth.currentUser;
 
@@ -19,320 +22,686 @@ const cargarMaterias = async () => {
     materias.value = await cargarSuscripcionesMateria(user.uid);
   } catch (e) {
     console.error(e);
-    error.value = "No se pudieron cargar tus materias.";
+    error.value = "No se pudieron cargar tus encuentros.";
   } finally {
     cargando.value = false;
   }
 };
 
+
 const abrirReunion = (materia: SuscripcionMateria) => {
+
   if (materia.enlace_reunion) {
-    window.open(materia.enlace_reunion, "_blank");
+
+    window.open(
+      materia.enlace_reunion,
+      "_blank"
+    );
+
   } else {
-    alert("El docente todavía no ha configurado el enlace de reunión.");
+
+    mensajeAviso.value =
+      "El docente todavía no ha configurado el enlace de la reunión virtual.";
+
+    mostrarAviso.value = true;
+
   }
+
 };
+
+
+const cerrarAviso = () => {
+  mostrarAviso.value = false;
+};
+
 
 onMounted(() => {
   cargarMaterias();
 });
 </script>
 
+
 <template>
-  <div class="encuentros-page role-page">
 
-    <div class="page-header">
-      <h1>Mis encuentros</h1>
-      <p>
-        Accede a tus clases virtuales del semestre
-      </p>
-    </div>
+<div class="encuentros-page role-page">
 
 
-    <p v-if="cargando" class="empty-state">
-      Cargando encuentros...
+  <div class="page-header">
+
+    <h1>
+      Mis encuentros
+    </h1>
+
+    <p>
+      Accede a tus clases virtuales del semestre
     </p>
 
-
-    <p v-else-if="error" class="empty-state">
-      {{ error }}
-    </p>
+  </div>
 
 
-    <div 
-      v-else-if="materias.length"
-      class="encuentros-grid"
+
+  <p 
+    v-if="cargando"
+    class="empty-state"
+  >
+    Cargando encuentros...
+  </p>
+
+
+
+  <p 
+    v-else-if="error"
+    class="empty-state"
+  >
+    {{ error }}
+  </p>
+
+
+
+
+  <div
+    v-else-if="materias.length"
+    class="encuentros-grid"
+  >
+
+
+
+    <article
+      v-for="materia in materias"
+      :key="materia.id || materia.materia_codigo"
+      class="encuentro-card"
     >
 
-      <article
-        v-for="materia in materias"
-        :key="materia.id || materia.materia_codigo"
-        class="encuentro-card"
+
+
+      <div class="encuentro-icon">
+
+        <svg
+          width="26"
+          height="26"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+
+          <polygon points="23 7 16 12 23 17 23 7"/>
+
+          <rect 
+            x="1"
+            y="5"
+            width="15"
+            height="14"
+            rx="2"
+          />
+
+        </svg>
+
+
+      </div>
+
+
+
+
+      <div class="encuentro-info">
+
+
+        <span class="materia-codigo">
+          {{ materia.materia_codigo }}
+        </span>
+
+
+
+        <h3>
+          {{ materia.materia_label }}
+        </h3>
+
+
+
+        <p>
+          Profesor:
+          {{ materia.profesor || "No asignado" }}
+        </p>
+
+
+
+        <small>
+          {{ materia.semestre || "Semestre actual" }}
+        </small>
+
+
+
+      </div>
+
+
+
+
+
+      <button
+
+        type="button"
+
+        class="reunion-btn"
+
+        :class="{
+          disabled: !materia.enlace_reunion
+        }"
+
+        @click="abrirReunion(materia)"
+
       >
 
-        <div class="encuentro-icon">
-          <svg
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <polygon points="23 7 16 12 23 17 23 7" />
-            <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
-          </svg>
-        </div>
+        {{
+          materia.enlace_reunion
+          ? "Ingresar a reunión"
+          : "Sin enlace disponible"
+        }}
 
 
-        <div class="encuentro-info">
-
-          <span class="materia-codigo">
-            {{ materia.materia_codigo }}
-          </span>
+      </button>
 
 
-          <h3>
-            {{ materia.materia_label }}
-          </h3>
 
+    </article>
 
-          <p>
-            Profesor:
-            {{ materia.profesor || "No asignado" }}
-          </p>
-
-
-          <small>
-            {{ materia.semestre || "Semestre actual" }}
-          </small>
-
-        </div>
-
-
-        <button
-          type="button"
-          class="reunion-btn"
-          @click="abrirReunion(materia)"
-        >
-          Ingresar a reunión
-        </button>
-
-
-      </article>
-
-    </div>
-
-
-    <p v-else class="empty-state">
-      No tienes materias suscritas actualmente.
-    </p>
 
 
   </div>
+
+
+
+
+  <p
+    v-else
+    class="empty-state"
+  >
+
+    No tienes materias suscritas actualmente.
+
+  </p>
+
+
+
+
+
+
+  <!-- MODAL -->
+
+  <div
+
+    v-if="mostrarAviso"
+
+    class="modal-overlay"
+
+    @click.self="cerrarAviso"
+
+  >
+
+
+
+    <div class="modal-aviso">
+
+
+      <div class="modal-icono">
+
+
+        <svg
+          width="30"
+          height="30"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+
+          <polygon points="23 7 16 12 23 17 23 7"/>
+
+          <rect 
+            x="1"
+            y="5"
+            width="15"
+            height="14"
+            rx="2"
+          />
+
+        </svg>
+
+
+      </div>
+
+
+
+      <h3>
+        Reunión no disponible
+      </h3>
+
+
+
+      <p>
+        {{ mensajeAviso }}
+      </p>
+
+
+
+
+      <button
+
+        class="modal-btn"
+
+        @click="cerrarAviso"
+
+      >
+
+        Entendido
+
+      </button>
+
+
+
+    </div>
+
+
+  </div>
+
+
+
+
+</div>
+
+
 </template>
+
+
 
 <style scoped>
 
+
 .encuentros-page {
+
+  max-width: 950px;
+
   padding: 20px;
+
 }
+
 
 
 .page-header h1 {
+
   font-size: 28px;
+
   margin-bottom: 6px;
+
 }
+
 
 
 .page-header p {
+
   color: var(--color-text-muted);
-  margin-bottom: 25px;
+
+  margin-bottom: 30px;
+
 }
+
+
 
 
 .encuentros-grid {
-  display: grid;
-  gap: 18px;
+
+  display:grid;
+
+  gap:18px;
+
 }
+
+
 
 
 .encuentro-card {
-  background: white;
-  border: 1px solid var(--color-border-light);
-  border-radius: 16px;
-  padding: 22px;
-  display: flex;
-  align-items: center;
-  gap: 18px;
-  justify-content: space-between;
+
+
+  background:white;
+
+  border:1px solid var(--color-border-light);
+
+  border-radius:18px;
+
+  padding:22px;
+
+  display:flex;
+
+  align-items:center;
+
+  gap:18px;
+
+  box-shadow:0 8px 25px rgba(15,23,42,.05);
+
+  transition:.2s;
+
+
 }
+
+
+
+.encuentro-card:hover {
+
+  transform:translateY(-2px);
+
+}
+
+
 
 
 .encuentro-icon {
-  width: 48px;
-  height: 48px;
-  border-radius: 14px;
-  background: #ecfdf5;
-  color: #059669;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+
+
+  width:52px;
+
+  height:52px;
+
+  border-radius:16px;
+
+  background:#ecfdf5;
+
+  color:#059669;
+
+  display:flex;
+
+  align-items:center;
+
+  justify-content:center;
+
+
 }
+
+
 
 
 .encuentro-info {
-  flex: 1;
-}
 
-
-.encuentro-info h3 {
-  margin: 6px 0;
-  font-size: 18px;
-}
-
-
-.encuentro-info p {
-  margin: 0;
-  color: #64748b;
-}
-
-
-.encuentro-info small {
-  color: #94a3b8;
-}
-
-
-.reunion-btn {
-  background: #087f6e;
-  color: white;
-  border: none;
-  padding: 12px 22px;
-  border-radius: 12px;
-  cursor: pointer;
-  font-weight: 600;
-}
-
-
-.reunion-btn:hover {
-  opacity: 0.9;
-}
-
-
-@media(max-width:768px){
-
-  .encuentro-card {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .reunion-btn {
-    width:100%;
-  }
+  flex:1;
 
 }
 
-.materias-page {
-  max-width: 900px;
-}
-
-.materias-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 16px;
-}
-
-
-.materia-card {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  padding: 18px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-
-.materia-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
 
 
 .materia-codigo {
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--color-accent);
-  background: var(--color-info-bg);
-  padding: 4px 10px;
-  border-radius: 8px;
+
+
+  display:inline-block;
+
+  font-size:12px;
+
+  font-weight:700;
+
+  color:#2563eb;
+
+  background:#eff6ff;
+
+  padding:5px 10px;
+
+  border-radius:10px;
+
+
 }
 
 
-.materia-semestre {
-  font-size: 12px;
-  color: var(--color-text-muted);
+
+
+.encuentro-info h3 {
+
+
+  margin:10px 0 6px;
+
+  font-size:19px;
+
+  color:#0f172a;
+
+
 }
 
 
-.materia-nombre {
-  margin: 5px 0;
-  font-size: 17px;
-  color: var(--color-text);
+
+
+.encuentro-info p {
+
+
+  margin:0;
+
+  color:#64748b;
+
 }
 
 
-.materia-label {
-  margin: 0;
-  color: var(--color-text-secondary);
-  font-size: 14px;
+
+.encuentro-info small {
+
+
+  color:#94a3b8;
+
 }
+
+
+
 
 
 .reunion-btn {
 
-  margin-top: 10px;
 
-  border: none;
-  border-radius: 10px;
+  border:none;
 
-  padding: 11px 16px;
+  border-radius:12px;
 
-  background: #0f766e;
-  color: white;
+  padding:12px 22px;
 
-  font-weight: 600;
-  font-size: 13px;
+  background:#087f6e;
 
-  cursor: pointer;
+  color:white;
 
-  transition: .2s;
+  font-weight:600;
+
+  cursor:pointer;
+
+  transition:.2s;
+
+
 }
+
 
 
 .reunion-btn:hover {
-  background: #115e59;
+
+
+  background:#115e59;
+
+
 }
+
+
+
+.reunion-btn.disabled {
+
+
+  background:#cbd5e1;
+
+  cursor:not-allowed;
+
+
+}
+
+
 
 
 .empty-state {
 
-  text-align: center;
 
-  padding: 35px;
+  text-align:center;
 
-  color: var(--color-text-muted);
+  padding:35px;
 
-  background: var(--color-surface);
+  color:var(--color-text-muted);
 
-  border-radius: var(--radius-lg);
+  background:white;
 
-  border: 1px solid var(--color-border);
+  border-radius:16px;
+
+  border:1px solid var(--color-border-light);
+
 
 }
+
+
+
+
+.modal-overlay {
+
+
+  position:fixed;
+
+  inset:0;
+
+  background:rgba(15,23,42,.45);
+
+  display:flex;
+
+  justify-content:center;
+
+  align-items:center;
+
+  z-index:999;
+
+
+}
+
+
+
+
+
+.modal-aviso {
+
+
+  width:380px;
+
+  background:white;
+
+  padding:30px;
+
+  border-radius:20px;
+
+  text-align:center;
+
+  box-shadow:0 20px 50px rgba(0,0,0,.2);
+
+
+}
+
+
+
+
+.modal-icono {
+
+
+  width:60px;
+
+  height:60px;
+
+  margin:auto;
+
+  border-radius:50%;
+
+  background:#ecfdf5;
+
+  color:#059669;
+
+  display:flex;
+
+  align-items:center;
+
+  justify-content:center;
+
+
+}
+
+
+
+
+
+.modal-aviso h3 {
+
+
+  margin-top:18px;
+
+  color:#0f172a;
+
+
+}
+
+
+
+
+
+.modal-aviso p {
+
+
+  color:#64748b;
+
+  line-height:1.5;
+
+
+}
+
+
+
+
+
+.modal-btn {
+
+
+  margin-top:20px;
+
+  background:#087f6e;
+
+  color:white;
+
+  border:none;
+
+  padding:12px 30px;
+
+  border-radius:12px;
+
+  cursor:pointer;
+
+  font-weight:600;
+
+
+}
+
+
+
+@media(max-width:768px){
+
+
+.encuentro-card{
+
+  flex-direction:column;
+
+  align-items:stretch;
+
+}
+
+
+
+.reunion-btn{
+
+  width:100%;
+
+}
+
+
+}
+
 
 </style>
