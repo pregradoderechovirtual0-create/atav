@@ -467,48 +467,47 @@ const tipoColorParcial: Record<string, string> = {
       </div>
     </section>
 
-    <section class="card materias-suscritas">
-
-<div class="card-header">
-  <div>
-    <h2>Mis materias suscritas</h2>
-    <p class="materias-subtitle">
-      Accede a tus encuentros virtuales del semestre
-    </p>
+<section class="card materias-suscritas">
+  <div class="card-header">
+    <div>
+      <h2>Mis materias suscritas</h2>
+      <p class="materias-subtitle">
+        Accede a tus encuentros virtuales del semestre
+      </p>
+    </div>
   </div>
-</div>
 
-    <div
-      v-for="materia in materiasSuscritas"
-      :key="materia.materia_codigo"
-      class="materia-suscrita-row"
-    >
+  <div
+    v-for="materia in materiasSuscritas"
+    :key="materia.materia_codigo"
+    class="materia-suscrita-row"
+  >
 
-      <div class="materia-suscrita-info">
+    <div class="materia-suscrita-info">
 
-        <strong>
-          {{ materia.materia_label }}
-        </strong>
+      <span class="materia-codigo">
+        {{ materia.materia_codigo }}
+      </span>
 
-        <span>
-          Profesor:
-          {{ materia.profesor || 'Sin asignar' }}
-          ·
-          {{ materia.semestre || 'Semestre no indicado' }}
-        </span>
+      <strong>
+        {{ materia.materia_label }}
+      </strong>
 
-      </div>
-
-
-      <button
-        class="materia-suscrita-action"
-      >
-        Ingresar reunión
-      </button>
-
+      <small>
+        Profesor:
+        {{ materia.profesor || "Sin asignar" }}
+        ·
+        {{ materia.semestre || "Sin semestre" }}
+      </small>
 
     </div>
 
+
+    <button class="materia-reunion-btn">
+      Ingresar reunión
+    </button>
+
+  </div>
 </section>
 
     <div class="info-bar">
@@ -796,7 +795,83 @@ const tipoColorParcial: Record<string, string> = {
   </div>
 </template>
 
+
 <style scoped>
+
+.materias-suscritas {
+  overflow: hidden;
+}
+
+
+.materias-subtitle {
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+
+.materia-suscrita-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--color-border-light);
+}
+
+
+.materia-suscrita-row:last-child {
+  border-bottom: none;
+}
+
+
+.materia-suscrita-info {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+
+.materia-codigo {
+  width: fit-content;
+  font-size: 11px;
+  font-weight: 700;
+  color: #0f766e;
+  background: #f0fdfa;
+  padding: 3px 10px;
+  border-radius: 20px;
+}
+
+
+.materia-suscrita-info strong {
+  font-size: 15px;
+  color: var(--color-text);
+}
+
+
+.materia-suscrita-info small {
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+
+
+.materia-reunion-btn {
+  background: #0f766e;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 18px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+
+.materia-reunion-btn:hover {
+  background: #115e59;
+}
+
 .estudiante-dashboard {
   display: flex;
   flex-direction: column;
@@ -1458,3 +1533,4 @@ const tipoColorParcial: Record<string, string> = {
   }
 }
 </style>
+
