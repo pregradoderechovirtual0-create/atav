@@ -42,7 +42,11 @@ const formData = ref({
   materiaCodigo: "",
   descripcion: "",
   tipoReprogramacion: "",
-  fechasReprogramacion: ["", "", ""],
+  fechasReprogramacion: [
+  { inicio: "", fin: "" },
+  { inicio: "", fin: "" },
+  { inicio: "", fin: "" },
+],
 });
 
 const tiposAusentismo = TIPOS_AUSENTISMO;
@@ -75,11 +79,12 @@ const canGoNext = computed(() => {
     );
   }
   if (currentStep.value === 3) {
-    return (
-      !!formData.value.tipoReprogramacion &&
-      !!formData.value.fechasReprogramacion[0]
-    );
-  }
+  return (
+    !!formData.value.tipoReprogramacion &&
+    !!formData.value.fechasReprogramacion[0].inicio &&
+    !!formData.value.fechasReprogramacion[0].fin
+  );
+}
   return true;
 });
 
@@ -131,7 +136,8 @@ const formularioCompleto = computed(
     !!formData.value.materiaCodigo &&
     !!formData.value.descripcion.trim() &&
     !!formData.value.tipoReprogramacion &&
-    !!formData.value.fechasReprogramacion[0],
+    !!formData.value.fechasReprogramacion[0].inicio &&
+    !!formData.value.fechasReprogramacion[0].fin,
 );
 
 const nextStep = () => {
@@ -173,7 +179,9 @@ const enviar = async () => {
     }
 
     const materia = materiaSeleccionada.value;
-    const fechas = formData.value.fechasReprogramacion.filter(Boolean);
+    const fechas = formData.value.fechasReprogramacion.filter(
+    (fecha) => fecha.inicio && fecha.fin
+    );
 
     await crearSolicitudDocente({
       usuario_id: user.uid,

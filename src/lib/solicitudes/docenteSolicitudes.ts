@@ -22,7 +22,7 @@ export interface SolicitudDocente {
   descripcion: string
   tipo_reprogramacion: string
   tipoReprogramacionLabel: string
-  fechas_reprogramacion: string[]
+  fechas_reprogramacion: FechaReprogramacion[]
   estado: string
   estadoLabel: string
   estadoClass: string
@@ -357,7 +357,10 @@ export async function fetchSolicitudDocente(
   )
 }
 
-
+  export interface FechaReprogramacion {
+  inicio: string
+  fin: string
+} 
 
 export interface CrearSolicitudDocenteInput {
 
@@ -380,40 +383,21 @@ export interface CrearSolicitudDocenteInput {
 
 // NUEVA VALIDACIÓN
 const validarMaximoDosSemanas = (
-  fechaInicio:string,
-  fechas:string[]
-)=>{
+  fechaInicio: string,
+  fechas: FechaReprogramacion[]
+) => {
+  const inicio = new Date(fechaInicio);
 
-  const inicio =
-    new Date(fechaInicio)
-
-
-  return fechas.every(fecha=>{
-
-    const nuevaFecha =
-      new Date(fecha)
-
+  return fechas.every((fecha) => {
+    const nuevaFecha = new Date(fecha.inicio);
 
     const diferencia =
-      (
-        nuevaFecha.getTime()
-        -
-        inicio.getTime()
-      )
-      /
-      (
-        1000 *
-        60 *
-        60 *
-        24
-      )
+      (nuevaFecha.getTime() - inicio.getTime()) /
+      (1000 * 60 * 60 * 24);
 
-
-    return diferencia <= 14
-
-  })
-
-}
+    return diferencia <= 14;
+  });
+};
 
 
 
