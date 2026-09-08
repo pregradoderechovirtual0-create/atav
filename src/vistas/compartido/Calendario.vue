@@ -171,7 +171,7 @@ const clasesDelMes = computed(() => {
       if (enPeriodoNoLectivo(fechaStr)) continue
       lista.push({
         id: `clase-${m.codigo}-${fechaStr}`,
-        titulo: `Clase: ${m.nombre}`,
+        titulo: `Encuentro Sincronico: ${m.nombre}`,
         descripcion: `${m.codigo} · ${m.profesor} · ${m.hora}`,
         fecha: fechaStr,
         tipo: 'clase',
@@ -417,7 +417,7 @@ const eliminarPeriodo = async (id: string) => {
           </div>
           <div class="leyenda-item">
             <span class="dot tipo-clase"></span>
-            <span>Clase</span>
+            <span>Encuentro Sincronico</span>
           </div>
           <div class="leyenda-item">
             <span class="dot tipo-pendiente"></span>
@@ -489,7 +489,7 @@ const eliminarPeriodo = async (id: string) => {
                   <div class="evento-info">
                     <span class="evento-titulo">{{ ev.titulo }}</span>
                     <span v-if="ev.descripcion" class="evento-desc">{{ ev.descripcion }}</span>
-                    <span class="evento-origen">{{ ev.origen === 'auto' ? 'Automático' : ev.origen === 'clase' ? 'Clase recurrente' : 'Manual' }}</span>
+                    <span class="evento-origen">{{ ev.origen === 'auto' ? 'Automático' : ev.origen === 'clase' ? 'Encuentro Sincronico recurrente' : 'Manual' }}</span>
                   </div>
                   <button
                     v-if="esDirector && ev.origen === 'manual'"
@@ -558,7 +558,7 @@ const eliminarPeriodo = async (id: string) => {
             <div class="modal-header">
               <div>
                 <h2 class="modal-title">Periodos no lectivos</h2>
-                <p class="modal-subtitle">Vacaciones, semana santa, etc. — las clases no se generan en estas fechas</p>
+                <p class="modal-subtitle">Vacaciones, semana santa, etc. — los encuentros sincronicos no se generan en estas fechas</p>
               </div>
               <button class="modal-close" @click="modalPeriodosVisible = false">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
