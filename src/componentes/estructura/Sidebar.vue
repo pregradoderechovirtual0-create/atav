@@ -89,13 +89,26 @@ const menuItems = computed(() => {
   }
 
   return [
-    { name: "Inicio", path: "/estudiante", icon: "home" },
-    { name: "Mis materias", path: "/estudiante/materias", icon: "book" },
+    { name: "Inicio", 
+      path: "/estudiante", 
+      icon: "home" },
+
+    { name: "Mis materias", 
+      path: "/estudiante/materias", 
+      icon: "book" },
+
+    {
+      name: "Mis encuentros",
+      path: "/estudiante/mis-encuentros",
+      icon: "video",
+    },
+
     {
       name: "Solicitar flexibilización",
       path: "/estudiante/flexibilidad",
       icon: "calendar-clock",
     },
+
     {
       name: "Solicitar supletorio",
       path: "/estudiante/supletorios",
@@ -106,8 +119,14 @@ const menuItems = computed(() => {
       path: "/estudiante/habilitaciones",
       icon: "book-open",
     },
-    { name: "Calendario", path: "/estudiante/calendario", icon: "calendar" },
-    { name: "Recursos", path: "/estudiante/recursos", icon: "folder" },
+    { name: "Calendario", 
+      path: "/estudiante/calendario", 
+      icon: "calendar" },
+
+    { name: "Recursos", 
+      path: "/estudiante/recursos", 
+      icon: "folder" },
+
   ];
 });
 

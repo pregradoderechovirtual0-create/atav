@@ -122,6 +122,12 @@ export const routes: RouteRecordRaw[] = [
     path: "/estudiante/materias",
     component: lazy(() => import("@/vistas/estudiante/EstudianteMaterias.vue")),
   },
+{
+  path: "/estudiante/mis-encuentros",
+  component: lazy(
+    () => import("@/vistas/estudiante/EstudianteMisEncuentros.vue"),
+  ),
+},
   {
     path: "/estudiante/crear-solicitud",
     component: lazy(
