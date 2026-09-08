@@ -74,7 +74,7 @@ const confirmandoAccion = ref(false);
    SELECCIÓN DE FECHA DE REPROGRAMACIÓN
    ========================================================= */
 
-const fechaReproSeleccionada = ref<string>("");
+const fechasReproSeleccionadas = ref<string[]>([]);
 const errorFechaRepro = ref(false);
 
 /* =========================================================
@@ -188,8 +188,11 @@ const fechasReprogramacionLista = (
   sol: SolicitudDirector | any | null | undefined,
 ) =>
   (sol?.fechas_reprogramacion || []).filter(
-    (fecha: unknown): fecha is string =>
-      typeof fecha === "string" && Boolean(fecha),
+    (fecha: any) =>
+      fecha &&
+      typeof fecha === "object" &&
+      typeof fecha.inicio === "string" &&
+      typeof fecha.fin === "string",
   );
 
 /* =========================================================
@@ -230,18 +233,22 @@ const verSolicitud = (sol: any) => {
    SELECCIONAR FECHA DESDE EL MODAL DE DETALLE
    ========================================================= */
 
-const seleccionarFechaReprogramacion = (fecha: string) => {
+const seleccionarFechaReprogramacion = (fecha: any) => {
   if (!solicitudSeleccionada.value) return;
 
-  /*
-   * Solo permitimos cambiar la fecha mientras
-   * la solicitud esté pendiente.
-   */
   if (solicitudSeleccionada.value.estado !== "Pendiente") {
     return;
   }
 
-  fechaReproSeleccionada.value = fecha;
+  const inicio = fecha.inicio;
+
+  if (fechasReproSeleccionadas.value.includes(inicio)) {
+    fechasReproSeleccionadas.value =
+      fechasReproSeleccionadas.value.filter((f) => f !== inicio);
+  } else {
+    fechasReproSeleccionadas.value.push(inicio);
+  }
+
   errorFechaRepro.value = false;
 };
 
@@ -1278,7 +1285,7 @@ const normalizarNombre = (nombre: unknown) =>
                       </span>
 
                       <span class="repro-opcion-fecha">
-                        {{ formatFechaHoraSolicitud(fecha) }}
+                        {{ formatFechaHoraSolicitud(fecha.inicio) }}
                       </span>
                     </span>
 
@@ -1580,12 +1587,11 @@ const normalizarNombre = (nombre: unknown) =>
                     }"
                   >
                     <input
-                      type="radio"
-                      name="fecha-repro"
-                      :value="fecha"
-                      v-model="fechaReproSeleccionada"
-                      @change="errorFechaRepro = false"
-                    />
+                    type="checkbox"
+                    :value="fecha.inicio"
+                    v-model="fechasReproSeleccionadas"
+                    @change="errorFechaRepro = false"
+/>
 
                     <span class="repro-opcion-radio-label">
                       <span class="repro-opcion-num">
