@@ -15,6 +15,11 @@ import {
   type MateriaRegistrada,
 } from "@/lib/dominio/materias";
 
+interface FechaReprogramacion {
+  inicio: string;
+  fin: string;
+}
+
 export interface SolicitudDirector {
   id: string;
   nombre: string;
@@ -96,7 +101,7 @@ export function mapSnapSolicitudesDirector(
       fecha_fin: data.fecha_fin as string | undefined,
       tipo_ausentismo: data.tipo_ausentismo as string | undefined,
       tipo_reprogramacion: data.tipo_reprogramacion as string | undefined,
-      fechas_reprogramacion: (data.fechas_reprogramacion as string[]) || [],
+      fechas_reprogramacion: (data.fechas_reprogramacion as FechaReprogramacion[]) || [],
       pdf_url: String(data.pdf_url || ""),
     };
   });
