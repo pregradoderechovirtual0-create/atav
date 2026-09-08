@@ -417,7 +417,7 @@ const eliminarPeriodo = async (id: string) => {
           </div>
           <div class="leyenda-item">
             <span class="dot tipo-clase"></span>
-            <span>Clase</span>
+            <span>Encuentro</span>
           </div>
           <div class="leyenda-item">
             <span class="dot tipo-pendiente"></span>
@@ -558,7 +558,7 @@ const eliminarPeriodo = async (id: string) => {
             <div class="modal-header">
               <div>
                 <h2 class="modal-title">Periodos no lectivos</h2>
-                <p class="modal-subtitle">Vacaciones, semana santa, etc. — las clases no se generan en estas fechas</p>
+                <p class="modal-subtitle">Vacaciones, semana santa, etc. — los encuentros no se generan en estas fechas</p>
               </div>
               <button class="modal-close" @click="modalPeriodosVisible = false">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">

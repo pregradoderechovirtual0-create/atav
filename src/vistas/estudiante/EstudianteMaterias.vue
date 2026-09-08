@@ -102,7 +102,7 @@ onMounted(async () => {
     <section v-else class="materias-disponibles">
       <div class="materias-disponibles-header">
         <div>
-          <h2>Clases disponibles para inscripción</h2>
+          <h2>Encuentros disponibles para inscripción</h2>
           <p>
             Selecciona las materias que estás viendo este semestre.
             {{ materias.length }} disponibles.
@@ -112,8 +112,8 @@ onMounted(async () => {
           v-model="busqueda"
           type="search"
           class="materias-search"
-          placeholder="Buscar clase..."
-          aria-label="Buscar entre las clases disponibles"
+          placeholder="Buscar encuentro..."
+          aria-label="Buscar entre los encuentros disponibles"
         />
       </div>
       <div class="materias-list">
@@ -145,7 +145,7 @@ onMounted(async () => {
           </button>
         </article>
         <p v-if="!materiasDisponibles.length">
-          No se encontraron clases con esa búsqueda.
+          No se encontraron encuentros con esa búsqueda.
         </p>
       </div>
     </section>
