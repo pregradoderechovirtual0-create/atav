@@ -1,0 +1,377 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isRealUser() {
+      return request.auth != null
+        && request.auth.token.firebase.sign_in_provider != 'anonymous';
+    }
+
+    function cedulaAuth() {
+      return request.auth.token.email.split('@')[0];
+    }
+
+    function usuarioAuth() {
+      return exists(/databases/$(database)/documents/usuarios/$(cedulaAuth()))
+        ? get(/databases/$(database)/documents/usuarios/$(cedulaAuth())).data
+        : null;
+    }
+
+    function perfilUsuario() {
+      return isRealUser()
+        ? usuarioAuth()
+        : get(/databases/$(database)/documents/usuarios/$(
+            get(/databases/$(database)/documents/auth_vinculos/$(request.auth.uid)).data.cedula
+          )).data;
+    }
+
+    function esDirector() {
+      let data = perfilUsuario();
+      return isAuthenticated()
+        && data != null
+        && (data.rol == 'Director' || data.rol == 'Jefa Suprema');
+    }
+
+    function esDocente() {
+      let data = perfilUsuario();
+      return isAuthenticated() && data != null && data.rol == 'Docente';
+    }
+
+    function esEstudiante() {
+      let data = perfilUsuario();
+      return isAuthenticated() && data != null && data.rol == 'Estudiante';
+    }
+
+    function esPerfilDirector() {
+      return resource.data.rol == 'Director' || resource.data.rol == 'Jefa Suprema';
+    }
+
+    function camposUsuarioProtegidos() {
+      return ['rol', 'password_hash', 'auth_uid', 'registrado'];
+    }
+
+    // FIX: antes era /indices/director_uids/{uid} (3 segmentos = ruta de documento
+    // inválida). Ahora es una colección raíz de 2 segmentos: /director_uids/{uid}.
+    function esUidDirectorRegistrado(uid) {
+      return uid is string
+        && uid.size() > 0
+        && exists(/databases/$(database)/documents/director_uids/$(uid));
+    }
+
+    function camposNotificacionValidos() {
+      return request.resource.data.keys().hasOnly([
+          'usuario_id', 'titulo', 'mensaje', 'tipo', 'leida', 'ruta', 'fecha_creacion',
+          'materia_codigo',
+        ])
+        && request.resource.data.usuario_id is string
+        && request.resource.data.usuario_id.size() > 0
+        && request.resource.data.titulo is string
+        && request.resource.data.titulo.size() > 0
+        && request.resource.data.titulo.size() <= 120
+        && request.resource.data.mensaje is string
+        && request.resource.data.mensaje.size() > 0
+        && request.resource.data.mensaje.size() <= 500
+        && request.resource.data.tipo in ['success', 'info', 'warning', 'error']
+        && request.resource.data.leida == false
+        && (!('ruta' in request.resource.data) || request.resource.data.ruta == null || request.resource.data.ruta is string);
+    }
+
+    // FIX: se agrega 'fecha_reprogramacion_seleccionada' a los campos permitidos,
+    // ya que el flujo de aprobación de inasistencias lo escribe junto con 'estado'.
+    function camposSolicitudDirectorUpdate() {
+      return request.resource.data.diff(resource.data).affectedKeys()
+        .hasOnly(['estado', 'motivo_rechazo', 'historial', 'actualizado_en', 'fecha_reprogramacion_seleccionada']);
+    }
+
+    function estadoSolicitudEstudianteValido() {
+      return request.resource.data.estado == 'pendiente'
+        && (!('motivo_rechazo' in request.resource.data) || request.resource.data.motivo_rechazo == '');
+    }
+
+    // FIX: colección raíz /director_uids/{uid} en lugar de /indices/director_uids/{uid}.
+    match /director_uids/{uid} {
+      allow read: if isAuthenticated();
+      allow create, update: if esDirector()
+        || (isRealUser() && request.auth.uid == uid && esDirector());
+      allow delete: if esDirector();
+    }
+
+    match /auth_vinculos/{authUid} {
+      allow read: if isAuthenticated() && request.auth.uid == authUid;
+      allow create: if isAuthenticated()
+        && request.auth.uid == authUid
+        && request.auth.token.firebase.sign_in_provider == 'anonymous'
+        && request.resource.data.keys().hasAll(['cedula', 'rol'])
+        && (
+          get(/databases/$(database)/documents/usuarios/$(request.resource.data.cedula)).data.authDesincronizado == true
+          || get(/databases/$(database)/documents/usuarios/$(request.resource.data.cedula)).data.passwordTemporal == true
+          || get(/databases/$(database)/documents/usuarios/$(request.resource.data.cedula)).data.requiereCambioPassword == true
+          || get(/databases/$(database)/documents/usuarios/$(request.resource.data.cedula)).data.registrado == false
+        );
+      allow delete: if isAuthenticated() && request.auth.uid == authUid;
+    }
+
+    match /usuarios/{userId} {
+      allow get: if
+        (isRealUser() && cedulaAuth() == userId)
+        || esDirector()
+        || (isRealUser() && esPerfilDirector())
+        || (resource != null && resource.data.registrado == false)
+        || (resource != null && resource.data.authDesincronizado == true)
+        || (resource != null && resource.data.passwordTemporal == true)
+        || (resource != null && resource.data.requiereCambioPassword == true);
+
+      allow list: if esDirector()
+        || (isAuthenticated()
+          && resource.data.rol in ['Director', 'Jefa Suprema']);
+
+      allow create: if esDirector()
+        && request.resource.data.rol in ['Docente', 'Estudiante', 'Director', 'Jefa Suprema'];
+
+      allow update: if esDirector()
+        || (
+          isRealUser()
+          && cedulaAuth() == userId
+          && resource.data.registrado == false
+          && request.resource.data.registrado == true
+          && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['rol'])
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'registrado', 'requiereCambioPassword', 'passwordTemporal', 'reactivacionPendiente',
+            'password_hash', 'auth_uid', 'authDesincronizado',
+          ])
+        )
+        || (
+          isRealUser()
+          && cedulaAuth() == userId
+          && request.resource.data.auth_uid == request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['auth_uid'])
+        )
+        || (
+          isRealUser()
+          && cedulaAuth() == userId
+          && !request.resource.data.diff(resource.data).affectedKeys().hasAny(camposUsuarioProtegidos())
+        )
+        || (
+          isAuthenticated()
+          && request.auth.token.firebase.sign_in_provider == 'anonymous'
+          && get(/databases/$(database)/documents/auth_vinculos/$(request.auth.uid)).data.cedula == userId
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['correo_personal'])
+          && request.resource.data.correo_personal is string
+          && request.resource.data.correo_personal.size() > 0
+        )
+        || (
+          isAuthenticated()
+          && request.auth.token.firebase.sign_in_provider == 'anonymous'
+          && (resource.data.authDesincronizado == true || resource.data.passwordTemporal == true)
+          && request.resource.data.passwordTemporal == false
+          && request.resource.data.authDesincronizado == resource.data.authDesincronizado
+          && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['auth_uid', 'rol', 'password_hash', 'registrado'])
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['passwordTemporal', 'claveTemporal'])
+        )
+        || (
+          isRealUser()
+          && cedulaAuth() == userId
+          && resource.data.requiereCambioPassword == true
+          && request.resource.data.requiereCambioPassword == false
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['password_hash', 'requiereCambioPassword', 'authDesincronizado', 'auth_uid', 'passwordTemporal', 'claveTemporal', 'reactivacionPendiente'])
+        )
+        || (
+          isAuthenticated()
+          && request.auth.token.firebase.sign_in_provider == 'anonymous'
+          && resource.data.requiereCambioPassword == true
+          && request.resource.data.requiereCambioPassword == false
+          && get(/databases/$(database)/documents/auth_vinculos/$(request.auth.uid)).data.cedula == userId
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['password_hash', 'requiereCambioPassword', 'authDesincronizado', 'auth_uid', 'passwordTemporal', 'claveTemporal', 'reactivacionPendiente'])
+        )
+        || (
+          isAuthenticated()
+          && request.auth.token.firebase.sign_in_provider == 'anonymous'
+          && resource.data.registrado == false
+          && request.resource.data.registrado == true
+          && get(/databases/$(database)/documents/auth_vinculos/$(request.auth.uid)).data.cedula == userId
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'registrado', 'requiereCambioPassword', 'passwordTemporal', 'reactivacionPendiente',
+            'password_hash', 'auth_uid', 'authDesincronizado',
+          ])
+        );
+
+      allow delete: if esDirector();
+    }
+
+    match /solicitudes/{docId} {
+      allow get: if isAuthenticated() && resource.data.usuario_id == request.auth.uid;
+      allow list: if esDirector()
+        || (isAuthenticated() && resource.data.usuario_id == request.auth.uid)
+        || (esEstudiante()
+          && resource.data.materia_codigo is string
+          && exists(/databases/$(database)/documents/suscripciones_materias/$(request.auth.uid + '_' + resource.data.materia_codigo)));
+      allow create: if isAuthenticated()
+        && esDocente()
+        && request.resource.data.usuario_id == request.auth.uid
+        && request.resource.data.estado == 'creada'
+        && request.resource.data.tipo == 'inasistencia'
+        && request.resource.data.descripcion is string
+        && request.resource.data.descripcion.size() > 0
+        && request.resource.data.materia_codigo is string
+        && request.resource.data.materia_codigo.size() > 0
+        && request.resource.data.fecha_inicio is string
+        && request.resource.data.fecha_fin is string
+        && request.resource.data.tipo_reprogramacion is string
+        && (!('motivo_rechazo' in request.resource.data) || request.resource.data.motivo_rechazo == '');
+      allow update: if esDirector() && camposSolicitudDirectorUpdate();
+      allow delete: if esDirector();
+    }
+
+    match /flexibilizaciones/{docId} {
+      allow get: if isAuthenticated() && resource.data.estudiante_id == request.auth.uid;
+      allow list: if esDirector()
+        || (isAuthenticated() && resource.data.estudiante_id == request.auth.uid);
+      allow create: if isAuthenticated()
+        && esEstudiante()
+        && request.resource.data.estudiante_id == request.auth.uid
+        && estadoSolicitudEstudianteValido()
+        && request.resource.data.nombre is string
+        && request.resource.data.nombre.size() > 0
+        && request.resource.data.parcial in ['1', '2', '3'];
+      allow update: if esDirector() && camposSolicitudDirectorUpdate();
+      allow delete: if esDirector();
+    }
+
+    match /habilitaciones/{docId} {
+      allow get: if isAuthenticated() && resource.data.estudiante_id == request.auth.uid;
+      allow list: if esDirector()
+        || (isAuthenticated() && resource.data.estudiante_id == request.auth.uid);
+      allow create: if isAuthenticated()
+        && esEstudiante()
+        && request.resource.data.estudiante_id == request.auth.uid
+        && estadoSolicitudEstudianteValido();
+      allow update: if esDirector() && camposSolicitudDirectorUpdate();
+      allow delete: if esDirector();
+    }
+
+    match /supletorios/{docId} {
+      allow get: if isAuthenticated() && resource.data.estudiante_id == request.auth.uid;
+      allow list: if esDirector()
+        || (isAuthenticated() && resource.data.estudiante_id == request.auth.uid);
+      allow create: if isAuthenticated()
+        && esEstudiante()
+        && request.resource.data.estudiante_id == request.auth.uid
+        && estadoSolicitudEstudianteValido();
+      allow update: if esDirector() && camposSolicitudDirectorUpdate();
+      allow delete: if esDirector();
+    }
+
+    match /notificaciones/{docId} {
+      allow read, update: if isAuthenticated()
+        && resource.data.usuario_id == request.auth.uid;
+      allow create: if isAuthenticated()
+        && camposNotificacionValidos()
+        && (
+          (esDirector()
+            && request.resource.data.usuario_id != request.auth.uid
+            && request.resource.data.ruta is string
+            && !request.resource.data.ruta.matches('^/director/'))
+          || ((esDocente() || esEstudiante())
+            && request.resource.data.ruta is string
+            && request.resource.data.ruta.matches('^/director/')
+            && request.resource.data.usuario_id != request.auth.uid
+            && esUidDirectorRegistrado(request.resource.data.usuario_id))
+          || (esDocente()
+            && request.resource.data.usuario_id != request.auth.uid
+            && request.resource.data.ruta.matches('^/estudiante/')
+            && request.resource.data.materia_codigo is string
+            && exists(/databases/$(database)/documents/suscripciones_materias/$(request.resource.data.usuario_id + '_' + request.resource.data.materia_codigo)))
+          || (esDirector()
+            && request.resource.data.usuario_id != request.auth.uid
+            && request.resource.data.ruta.matches('^/estudiante/')
+            && request.resource.data.materia_codigo is string
+            && exists(/databases/$(database)/documents/suscripciones_materias/$(request.resource.data.usuario_id + '_' + request.resource.data.materia_codigo)))
+        );
+      allow delete: if esDirector();
+    }
+
+    match /materias/{docId} {
+      allow read: if isAuthenticated();
+      allow write: if esDirector();
+    }
+
+    match /suscripciones_materias/{docId} {
+      allow read: if esDirector()
+        || esDocente()
+        || (isAuthenticated() && resource.data.estudiante_id == request.auth.uid);
+      allow delete: if isAuthenticated() && resource.data.estudiante_id == request.auth.uid;
+      allow create: if (
+          esEstudiante()
+          || (
+            isAuthenticated()
+            && exists(/databases/$(database)/documents/auth_vinculos/$(request.auth.uid))
+            && get(/databases/$(database)/documents/auth_vinculos/$(request.auth.uid)).data.rol == 'Estudiante'
+          )
+        )
+        && request.resource.data.estudiante_id == request.auth.uid
+        && request.resource.data.materia_codigo is string
+        && request.resource.data.materia_codigo.size() > 0;
+      allow update: if false;
+    }
+
+    match /parciales/{docId} {
+      allow read: if isAuthenticated();
+      allow write: if esDirector();
+    }
+
+    match /llamadas/{docId} {
+      allow read, write: if esDirector();
+    }
+
+    match /aspirantes/{docId} {
+      allow read, write: if esDirector();
+    }
+
+    match /reprogramaciones/{docId} {
+      allow read, write: if esDirector();
+    }
+
+    match /eventos/{docId} {
+      allow read: if isAuthenticated();
+      allow write: if esDirector();
+    }
+
+    match /periodosNoLectivos/{docId} {
+      allow read: if isAuthenticated();
+      allow write: if esDirector();
+    }
+
+    match /documentos/{docId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if esDirector();
+    }
+
+    function claveJefaYaConfigurada() {
+      return exists(/databases/$(database)/documents/config/seguridad)
+        && get(/databases/$(database)/documents/config/seguridad).data.keys().hasAny(['clave_jefa_hash'])
+        && get(/databases/$(database)/documents/config/seguridad).data.clave_jefa_hash is string
+        && get(/databases/$(database)/documents/config/seguridad).data.clave_jefa_hash.size() > 0;
+    }
+
+    match /config/seguridad {
+      allow read: if esDirector();
+      allow create: if esDirector()
+        && request.resource.data.keys().hasOnly(['clave_jefa_hash'])
+        && request.resource.data.clave_jefa_hash is string
+        && request.resource.data.clave_jefa_hash.size() > 0;
+      allow update: if esDirector()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['clave_jefa_hash'])
+        && request.resource.data.clave_jefa_hash is string
+        && request.resource.data.clave_jefa_hash.size() > 0
+        && (perfilUsuario().rol == 'Jefa Suprema' || !claveJefaYaConfigurada());
+    }
+  }
+}

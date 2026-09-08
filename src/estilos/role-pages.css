@@ -1,0 +1,145 @@
+.role-page {
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.role-panel {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 20px 24px;
+}
+
+.role-empty {
+  font-size: 13px;
+  color: var(--color-text-muted);
+  text-align: center;
+  padding: 32px 16px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+}
+
+.role-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: var(--radius);
+  font-size: 13px;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+  text-decoration: none;
+  transition: all var(--transition);
+}
+
+.role-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.role-btn-primary {
+  background: var(--color-primary);
+  color: white;
+}
+
+.role-btn-primary:hover:not(:disabled) {
+  background: var(--color-primary-light);
+}
+
+.role-btn-secondary {
+  background: var(--color-subtle);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+}
+
+.role-btn-secondary:hover:not(:disabled) {
+  border-color: var(--color-text-muted);
+}
+
+.role-btn-ghost {
+  background: transparent;
+  color: var(--color-text-secondary);
+}
+
+.role-btn-ghost:hover:not(:disabled) {
+  color: var(--color-text);
+  background: var(--color-subtle);
+}
+
+.role-btn-danger {
+  background: #ffe5e5;
+  color: #d32f2f;
+  border: 1px solid #f5b5b5;
+}
+
+.role-btn-danger:hover:not(:disabled) {
+  background: #d32f2f;
+  color: white;
+}
+
+.role-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.role-field label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.role-field input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-subtle);
+  color: var(--color-text);
+  font-size: 14px;
+  outline: none;
+}
+
+.role-field input:focus {
+  border-color: var(--color-primary);
+}
+
+.role-field small {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.role-info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px 20px;
+}
+
+.role-info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.role-info-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--color-text-muted);
+}
+
+.role-info-value {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+@media (max-width: 640px) {
+  .role-info-grid {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,0 +1,182 @@
+/* Breakpoints centralizados */
+:root {
+  --bp-xs: 480px;
+  --bp-sm: 640px;
+  --bp-md: 768px;
+  --bp-lg: 1024px;
+  --bp-xl: 1200px;
+  --mobile-topbar-height: 56px;
+  --content-padding: 24px;
+  --content-padding-mobile: 16px;
+}
+
+@media (max-width: 768px) {
+  :root {
+    --content-padding: 16px;
+  }
+}
+
+/* Contenedores de página */
+.page-container {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+/* Tablas: scroll horizontal en pantallas pequeñas */
+.table-wrap,
+.table-wrapper {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+
+.table-wrap table,
+.table-wrapper table,
+.data-table {
+  min-width: 560px;
+}
+
+@media (max-width: 768px) {
+  .director-list-page .data-table,
+  .data-table {
+    table-layout: auto;
+  }
+
+  .table-wrap table,
+  .table-wrapper table,
+  .data-table {
+    min-width: 520px;
+    font-size: 12px;
+  }
+
+  .table-wrap th,
+  .table-wrap td,
+  .table-wrapper th,
+  .table-wrapper td,
+  .data-table th,
+  .data-table td {
+    padding: 10px 8px;
+    white-space: nowrap;
+  }
+
+  .data-table tbody tr.row-clickable {
+    cursor: pointer;
+  }
+
+  .data-table tbody tr.row-clickable:hover {
+    background: var(--color-subtle);
+  }
+
+  .data-table td:last-child,
+  .data-table th:last-child {
+    white-space: normal;
+  }
+}
+
+@media (max-width: 640px) {
+  .table-wrap table {
+    font-size: 13px;
+  }
+
+  .table-wrap th,
+  .table-wrap td {
+    padding: 10px 12px;
+  }
+}
+
+/* Grids responsivos genéricos */
+.responsive-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.responsive-grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+@media (max-width: 1024px) {
+  .responsive-grid-3 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .responsive-grid-2,
+  .responsive-grid-3 {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Formularios: campos en columna en móvil */
+@media (max-width: 640px) {
+  .form-row,
+  .field-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .form-row > *,
+  .field-row > * {
+    width: 100%;
+    min-width: 0;
+  }
+}
+
+/* Evitar zoom al enfocar inputs en iOS (font-size >= 16px) */
+@media (max-width: 768px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* Evitar overflow horizontal global */
+img,
+video,
+svg,
+canvas {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Director list: tablas y command bar en móvil */
+@media (max-width: 640px) {
+  .director-list-page .command-bar {
+    padding: 14px;
+  }
+
+  .director-list-page .search-box {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .director-list-page .command-actions .btn {
+    min-width: 0;
+    font-size: 13px;
+    padding: 10px 14px;
+  }
+}
+
+/* Solicitud pages: header en móvil */
+@media (max-width: 640px) {
+  .sol-page-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .sol-page-back {
+    align-self: flex-start;
+  }
+
+  .sol-page-title {
+    font-size: 20px;
+  }
+}

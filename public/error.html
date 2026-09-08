@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Error | ATAV</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;700&family=Google+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Google Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #fff;
+      color: #0f172a;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 32px 20px;
+      position: relative;
+      overflow: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .waves {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 40%;
+      pointer-events: none;
+    }
+
+    .waves svg { width: 100%; height: 100%; }
+
+    .card {
+      width: min(440px, 100%);
+      text-align: center;
+      position: relative;
+      z-index: 1;
+      animation: enter 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      margin-bottom: 32px;
+    }
+
+    .brand-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      background: #0f172a;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .brand-icon img { width: 24px; height: 24px; }
+
+    .brand-name {
+      font-family: 'Poppins', sans-serif;
+      font-size: 22px;
+      font-weight: 700;
+      color: #0f172a;
+    }
+
+    .visual {
+      width: 120px;
+      height: 120px;
+      margin: 0 auto 24px;
+      border-radius: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      box-shadow: 0 4px 24px rgba(15, 23, 42, 0.06);
+    }
+
+    .visual--401, .visual--403 { background: linear-gradient(145deg, #fffbeb, #fef3c7); border-color: #fde68a; }
+    .visual--500, .visual--503 { background: linear-gradient(145deg, #fef2f2, #fee2e2); border-color: #fecaca; }
+    .visual--offline { background: linear-gradient(145deg, #f1f5f9, #e2e8f0); border-color: #cbd5e1; }
+
+    .code {
+      font-size: 36px;
+      font-weight: 700;
+      letter-spacing: -2px;
+      line-height: 1;
+    }
+
+    h1 {
+      font-size: clamp(20px, 4vw, 26px);
+      font-weight: 700;
+      margin-bottom: 10px;
+      line-height: 1.25;
+    }
+
+    .desc {
+      font-size: 15px;
+      color: #64748b;
+      line-height: 1.55;
+      margin-bottom: 8px;
+    }
+
+    .hint {
+      font-size: 13px;
+      color: #94a3b8;
+      line-height: 1.5;
+      margin-bottom: 24px;
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-bottom: 28px;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      padding: 12px 20px;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      font-family: inherit;
+      text-decoration: none;
+      border: none;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .btn-primary { background: #0f172a; color: white; }
+    .btn-primary:hover { background: #1e293b; transform: translateY(-1px); }
+    .btn-secondary { background: white; color: #0f172a; border: 1px solid #e2e8f0; }
+    .btn-secondary:hover { background: #f8fafc; }
+
+    .footer {
+      font-size: 11px;
+      color: #94a3b8;
+      letter-spacing: 0.04em;
+    }
+
+    @keyframes enter {
+      from { opacity: 0; transform: translateY(16px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @media (max-width: 640px) {
+      .actions { flex-direction: column; width: 100%; }
+      .btn { width: 100%; justify-content: center; }
+    }
+  </style>
+</head>
+<body>
+  <div class="waves" aria-hidden="true">
+    <svg viewBox="0 0 1440 320" preserveAspectRatio="none">
+      <path fill="rgba(15,23,42,0.04)" d="M0,96L48,112C96,128,192,160,288,160C384,160,480,128,576,112C672,96,768,96,864,112C960,128,1056,160,1152,160C1248,160,1344,128,1392,112L1440,96L1440,320L0,320Z"/>
+    </svg>
+  </div>
+
+  <div class="card">
+    <div class="brand">
+      <div class="brand-icon">
+        <img src="/logoatav.svg" alt="" width="24" height="24" />
+      </div>
+      <span class="brand-name">atav</span>
+    </div>
+
+    <div class="visual" id="visual">
+      <span class="code" id="code">404</span>
+    </div>
+
+    <h1 id="title">Página no encontrada</h1>
+    <p class="desc" id="desc">La ruta que intentas visitar no existe o fue movida.</p>
+    <p class="hint" id="hint">Verifica la dirección o usa el menú lateral.</p>
+
+    <div class="actions">
+      <a href="/" class="btn btn-primary">Ir al inicio</a>
+      <button type="button" class="btn btn-secondary" onclick="history.back()">Volver atrás</button>
+    </div>
+
+    <p class="footer">Derecho Virtual · USC</p>
+  </div>
+
+  <script>
+    const META = {
+      '401': {
+        title: 'Sesión expirada',
+        desc: 'Tu sesión ya no es válida. Inicia sesión de nuevo.',
+        hint: 'Si cerraste sesión en otra pestaña, esto es normal.',
+      },
+      '403': {
+        title: 'Acceso no permitido',
+        desc: 'No tienes permiso para ver esta sección.',
+        hint: 'Contacta a Derecho Virtual si crees que es un error.',
+      },
+      '404': {
+        title: 'Página no encontrada',
+        desc: 'La ruta que intentas visitar no existe o fue movida.',
+        hint: 'Verifica la dirección en la barra del navegador.',
+      },
+      '500': {
+        title: 'Algo salió mal',
+        desc: 'Ocurrió un error al cargar la aplicación.',
+        hint: 'Recarga la página o vuelve al inicio.',
+      },
+      '503': {
+        title: 'Servicio no disponible',
+        desc: 'El sistema no responde en este momento.',
+        hint: 'Intenta en unos minutos.',
+      },
+      offline: {
+        title: 'Sin conexión',
+        desc: 'No hay internet o no se puede contactar al servidor.',
+        hint: 'Revisa tu conexión y vuelve a intentar.',
+      },
+    }
+
+    const pathMatch = location.pathname.match(/\/error\/([^/]+)/)
+    const params = new URLSearchParams(location.search)
+    let code = pathMatch?.[1] || params.get('code') || '404'
+    if (code === 'network') code = 'offline'
+    const meta = META[code] || META['404']
+
+    document.title = `Error ${code} | ATAV`
+    document.getElementById('code').textContent = code
+    document.getElementById('title').textContent = meta.title
+    document.getElementById('desc').textContent = meta.desc
+    document.getElementById('hint').textContent = meta.hint
+    document.getElementById('visual').classList.add(`visual--${code}`)
+  </script>
+</body>
+</html>

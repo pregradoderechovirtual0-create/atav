@@ -1,0 +1,13 @@
+{
+  "projects": {
+    "default": "atav-48646"
+  },
+  "targets": {
+    "atav-48646": {
+      "hosting": {
+        "portal": ["atavportal"],
+        "legacy": ["atav-48646"]
+      }
+    }
+  }
+}
