@@ -636,6 +636,20 @@ const importarArchivo = async (event: Event) => {
               </section>
             </div>
 
+<div class="field-group field-group-full">
+  <label class="field-label" for="materia-enlace">
+    Enlace reunión virtual
+  </label>
+
+  <input
+    id="materia-enlace"
+    v-model="formMateria.enlace_reunion"
+    class="field-input"
+    placeholder="https://meet.google.com/..."
+  />
+</div>
+              </section>
+            </div>
             <div class="modal-footer modal-footer-actions">
               <button type="button" class="btn btn-secondary" @click="cerrarModal">Cancelar</button>
               <button type="button" class="btn btn-primary" @click="guardarMateria">
