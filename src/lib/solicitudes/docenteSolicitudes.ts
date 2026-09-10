@@ -10,6 +10,11 @@ import {
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 
+export interface FechaReprogramacion {
+  inicio: string
+  fin: string
+}
+
 export interface SolicitudDocente {
   id: string
   usuario_id: string
@@ -22,7 +27,7 @@ export interface SolicitudDocente {
   descripcion: string
   tipo_reprogramacion: string
   tipoReprogramacionLabel: string
-  fechas_reprogramacion: string[]
+  fechas_reprogramacion: FechaReprogramacion[]
   estado: string
   estadoLabel: string
   estadoClass: string
@@ -213,14 +218,16 @@ const reprogramacionResumen = (data: Record<string, any>) => {
     ? data.fechas_reprogramacion.filter(Boolean)
     : []
 
-
   if (!fechas.length)
     return tipo || '—'
 
+  const primeraFecha =
+    typeof fechas[0] === 'string'
+      ? fechas[0]
+      : fechas[0]?.inicio
 
-  return `${tipo} · ${formatFechaHoraSolicitud(fechas[0])}`
+  return `${tipo} · ${formatFechaHoraSolicitud(primeraFecha)}`
 }
-
 
 
 export const mapDocSolicitud = (
@@ -381,7 +388,7 @@ export interface CrearSolicitudDocenteInput {
   materia_label:string
   descripcion:string
   tipo_reprogramacion:string
-  fechas_reprogramacion:string[]
+  fechas_reprogramacion: FechaReprogramacion[]
   pdf_url?:string
 
 }
@@ -390,19 +397,15 @@ export interface CrearSolicitudDocenteInput {
 
 // NUEVA VALIDACIÓN
 const validarMaximoDosSemanas = (
-  fechaInicio:string,
-  fechas:string[]
-)=>{
+  fechaInicio: string,
+  fechas: FechaReprogramacion[]
+) => {
 
-  const inicio =
-    new Date(fechaInicio)
+  const inicio = new Date(fechaInicio)
 
+  return fechas.every(fecha => {
 
-  return fechas.every(fecha=>{
-
-    const nuevaFecha =
-      new Date(fecha)
-
+    const nuevaFecha = new Date(fecha.inicio)
 
     const diferencia =
       (
@@ -417,7 +420,6 @@ const validarMaximoDosSemanas = (
         60 *
         24
       )
-
 
     return diferencia <= 14
 
@@ -657,43 +659,46 @@ export function eventosCalendarioDesdeSolicitud(
 
 
 
-  sol.fechas_reprogramacion.forEach(
-    (f,i)=>{
+sol.fechas_reprogramacion.forEach(
+  (f, i) => {
 
-      const fecha =
-        fechaDeEvento(f)
+    const fechaInicio =
+      typeof f === 'string'
+        ? f
+        : f?.inicio
 
+    const fecha =
+      fechaDeEvento(fechaInicio)
 
-      if(!fecha)
-        return
+    if (!fecha)
+      return
 
+    eventos.push({
 
-      eventos.push({
+      id:
+        `${sol.id}-repro-${i}`,
 
-        id:
-          `${sol.id}-repro-${i}`,
+      titulo:
+        `Extensión de encuentro · ${sol.materia}`,
 
-        titulo:
-          `Extensión de encuentro · ${sol.materia}`,
+      fecha,
 
-        fecha,
+      tipo:
+        'solicitud',
 
-        tipo:
-          'solicitud',
+      estado:
+        estadoCal,
 
-        estado:
-          estadoCal,
+      descripcion:
+        `${sol.tipoReprogramacionLabel} · ${formatFechaHoraSolicitud(fechaInicio)}`,
 
-        descripcion:
-          `${sol.tipoReprogramacionLabel} · ${formatFechaHoraSolicitud(f)}`,
+      motivoRechazo:
+        '',
 
-        motivoRechazo:
-          '',
+    })
 
-      })
-
-    }
-  )
+  }
+)
 
 
   return eventos
