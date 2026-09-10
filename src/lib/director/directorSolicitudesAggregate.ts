@@ -46,7 +46,7 @@ export interface SolicitudDirector {
   fecha_inicio?: string;
   fecha_fin?: string;
   tipo_reprogramacion?: string;
-  fechas_reprogramacion?: string[];
+  fechas_reprogramacion?: FechaReprogramacion[];
   tipo_ausentismo?: string;
   fecha_reprogramacion_seleccionada?: string;
 }

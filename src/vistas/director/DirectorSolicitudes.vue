@@ -202,54 +202,41 @@ const fechasReprogramacionLista = (
 const verSolicitud = (sol: any) => {
   solicitudSeleccionada.value = sol;
 
-  /*
-   * Si la solicitud ya tiene una fecha seleccionada,
-   * la mostramos como seleccionada.
-   *
-   * Si tiene una sola fecha propuesta y todavía está
-   * pendiente, la seleccionamos automáticamente.
-   *
-   * Si tiene varias fechas, dejamos que el usuario elija.
-   */
   const fechas = fechasReprogramacionLista(sol);
 
-  if (sol.tipo === "inasistencia" && sol.estado === "Pendiente") {
-    if (sol.fecha_reprogramacion_seleccionada) {
-      fechaReproSeleccionada.value = sol.fecha_reprogramacion_seleccionada;
-    } else if (fechas.length === 1) {
-      fechaReproSeleccionada.value = fechas[0];
-    } else {
-      fechaReproSeleccionada.value = "";
-    }
+  /*
+   * Cargamos las fechas previamente seleccionadas.
+   * Se guarda el inicio como identificador porque el
+   * objeto completo se conserva en fechas_reprogramacion.
+   */
+  if (
+    Array.isArray(sol.fechas_reprogramacion_seleccionadas) &&
+    sol.fechas_reprogramacion_seleccionadas.length
+  ) {
+    fechasReproSeleccionadas.value =
+      sol.fechas_reprogramacion_seleccionadas
+        .map((f: any) => f?.inicio)
+        .filter((f: any): f is string => typeof f === "string");
+  } else if (sol.fecha_reprogramacion_seleccionada) {
+    /*
+     * Compatibilidad con solicitudes antiguas que solamente
+     * tienen una fecha seleccionada.
+     */
+    fechasReproSeleccionadas.value = [
+      sol.fecha_reprogramacion_seleccionada,
+    ];
+  } else if (sol.tipo === "inasistencia" && sol.estado === "Pendiente") {
+    /*
+     * Si solo existe una propuesta, se selecciona automáticamente.
+     */
+    fechasReproSeleccionadas.value =
+      fechas.length === 1 ? [fechas[0].inicio] : [];
   } else {
-    fechaReproSeleccionada.value = sol.fecha_reprogramacion_seleccionada || "";
+    fechasReproSeleccionadas.value = [];
   }
 
   errorFechaRepro.value = false;
   modalVerVisible.value = true;
-};
-
-/* =========================================================
-   SELECCIONAR FECHA DESDE EL MODAL DE DETALLE
-   ========================================================= */
-
-const seleccionarFechaReprogramacion = (fecha: any) => {
-  if (!solicitudSeleccionada.value) return;
-
-  if (solicitudSeleccionada.value.estado !== "Pendiente") {
-    return;
-  }
-
-  const inicio = fecha.inicio;
-
-  if (fechasReproSeleccionadas.value.includes(inicio)) {
-    fechasReproSeleccionadas.value =
-      fechasReproSeleccionadas.value.filter((f) => f !== inicio);
-  } else {
-    fechasReproSeleccionadas.value.push(inicio);
-  }
-
-  errorFechaRepro.value = false;
 };
 
 /* =========================================================
@@ -272,13 +259,10 @@ const requiereSeleccionFecha = computed(() => {
    PEDIR CONFIRMACIÓN
    ========================================================= */
 
-const pedirConfirmacion = (sol: any, accion: "aprobar" | "rechazar") => {
-  /*
-   * Guardamos primero la selección realizada en el modal
-   * de detalle para no perderla.
-   */
-  const seleccionActual = fechaReproSeleccionada.value;
-
+const pedirConfirmacion = (
+  sol: any,
+  accion: "aprobar" | "rechazar",
+) => {
   solicitudAccion.value = sol;
   accionPendiente.value = accion;
 
@@ -291,27 +275,36 @@ const pedirConfirmacion = (sol: any, accion: "aprobar" | "rechazar") => {
 
   if (accion === "aprobar" && sol.tipo === "inasistencia") {
     /*
-     * Prioridad:
-     *
-     * 1. Fecha seleccionada actualmente.
-     * 2. Fecha previamente guardada en Firestore.
-     * 3. Si solo existe una opción, se selecciona automáticamente.
-     * 4. Si existen varias, queda vacío.
+     * Recuperar selección existente.
      */
-    if (seleccionActual && fechas.includes(seleccionActual)) {
-      fechaReproSeleccionada.value = seleccionActual;
-    } else if (
-      sol.fecha_reprogramacion_seleccionada &&
-      fechas.includes(sol.fecha_reprogramacion_seleccionada)
+    if (
+      Array.isArray(sol.fechas_reprogramacion_seleccionadas) &&
+      sol.fechas_reprogramacion_seleccionadas.length
     ) {
-      fechaReproSeleccionada.value = sol.fecha_reprogramacion_seleccionada;
+      fechasReproSeleccionadas.value =
+        sol.fechas_reprogramacion_seleccionadas
+          .map((f: any) => f?.inicio)
+          .filter((f: any): f is string => typeof f === "string");
+    } else if (sol.fecha_reprogramacion_seleccionada) {
+      /*
+       * Compatibilidad con registros antiguos.
+       */
+      fechasReproSeleccionadas.value = [
+        sol.fecha_reprogramacion_seleccionada,
+      ];
     } else if (fechas.length === 1) {
-      fechaReproSeleccionada.value = fechas[0];
+      /*
+       * Una única propuesta: selección automática.
+       */
+      fechasReproSeleccionadas.value = [fechas[0].inicio];
     } else {
-      fechaReproSeleccionada.value = "";
+      /*
+       * Varias propuestas: el director debe seleccionar.
+       */
+      fechasReproSeleccionadas.value = [];
     }
   } else {
-    fechaReproSeleccionada.value = "";
+    fechasReproSeleccionadas.value = [];
   }
 
   modalConfirmVisible.value = true;
@@ -327,9 +320,12 @@ const intentarConfirmar = () => {
     return;
   }
 
-  if (requiereSeleccionFecha.value && !fechaReproSeleccionada.value) {
-    errorFechaRepro.value = true;
-    return;
+  if (
+  requiereSeleccionFecha.value &&
+  fechasReproSeleccionadas.value.length === 0
+  ) {
+  errorFechaRepro.value = true;
+  return;
   }
 
   errorMotivoRechazo.value = false;
@@ -353,10 +349,13 @@ const confirmarAccion = async () => {
     return;
   }
 
-  if (requiereSeleccionFecha.value && !fechaReproSeleccionada.value) {
-    errorFechaRepro.value = true;
-    return;
-  }
+ if (
+  requiereSeleccionFecha.value &&
+  fechasReproSeleccionadas.value.length === 0
+) {
+  errorFechaRepro.value = true;
+  return;
+}
 
   confirmandoAccion.value = true;
 
@@ -371,6 +370,12 @@ const confirmarAccion = async () => {
     /* =====================================================
        1. ACTUALIZAR FIRESTORE
        ===================================================== */
+
+       const fechasSeleccionadas =
+  fechasReprogramacionLista(solicitudAccion.value).filter(
+    (fecha: any) =>
+      fechasReproSeleccionadas.value.includes(fecha.inicio),
+  );
 
     const payload: Record<string, unknown> = {
       estado: estadoGuardar,

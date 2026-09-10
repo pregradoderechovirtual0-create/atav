@@ -46,7 +46,7 @@ const formData = ref({
   { inicio: "", fin: "" },
   { inicio: "", fin: "" },
   { inicio: "", fin: "" },
-]
+],
 });
 
 const tiposAusentismo = TIPOS_AUSENTISMO;
@@ -79,12 +79,10 @@ const canGoNext = computed(() => {
     );
   }
   if (currentStep.value === 3) {
-  const opcionPrincipal = formData.value.fechasReprogramacion[0];
-
   return (
     !!formData.value.tipoReprogramacion &&
-    !!opcionPrincipal.inicio &&
-    !!opcionPrincipal.fin
+    !!formData.value.fechasReprogramacion[0].inicio &&
+    !!formData.value.fechasReprogramacion[0].fin
   );
 }
   return true;
@@ -139,7 +137,7 @@ const formularioCompleto = computed(
     !!formData.value.descripcion.trim() &&
     !!formData.value.tipoReprogramacion &&
     !!formData.value.fechasReprogramacion[0].inicio &&
-    !!formData.value.fechasReprogramacion[0].fin
+    !!formData.value.fechasReprogramacion[0].fin,
 );
 
 const nextStep = () => {
@@ -180,28 +178,10 @@ const enviar = async () => {
       pdfUrl = await subirPdfCloudinary(archivo.value);
     }
 
-    const opciones = formData.value.fechasReprogramacion;
-
-    const hayOpcionIncompleta = opciones.some(
-      (fecha) =>
-      (fecha.inicio && !fecha.fin) ||
-      (!fecha.inicio && fecha.fin)
-    );
-
-    if (hayOpcionIncompleta) {
-  await dialog.alert(
-    "Cada opción de reprogramación debe tener hora de inicio y finalización.",
-    { variant: "warning" },
-  );
-  return;
-}
-
     const materia = materiaSeleccionada.value;
     const fechas = formData.value.fechasReprogramacion.filter(
     (fecha) => fecha.inicio && fecha.fin
     );
-
-    
 
     await crearSolicitudDocente({
       usuario_id: user.uid,
