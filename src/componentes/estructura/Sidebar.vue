@@ -92,9 +92,9 @@ const menuItems = computed(() => {
     { name: "Inicio", path: "/estudiante", icon: "home" },
     { name: "Mis materias", path: "/estudiante/materias", icon: "book" },
     {
-  name: "Mis encuentros",
-  path: "/estudiante/mis-materias",
-  icon: "video",
+      name: "Mis encuentros",
+      path: "/estudiante/mis-materias",
+      icon: "video",
     },
     {
       name: "Ausentismos docentes",
@@ -395,6 +395,15 @@ watch(
                 <polyline points="14 2 14 8 20 8" />
                 <polyline points="9 15 11 17 15 13" />
               </svg>
+              <svg
+                v-else-if="item.icon === 'video'"
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                ></svg>
               <svg
                 v-else-if="item.icon === 'folder'"
                 width="18"
