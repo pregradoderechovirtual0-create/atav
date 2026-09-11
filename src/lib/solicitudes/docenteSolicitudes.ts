@@ -10,11 +10,6 @@ import {
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 
-export interface FechaReprogramacion {
-  inicio: string
-  fin: string
-}
-
 export interface SolicitudDocente {
   id: string
   usuario_id: string
@@ -151,16 +146,15 @@ export const mapEstadoDocente = (estado: string) => {
 
 const extraerFecha = (timestamp: any): { iso: string; sort: number } => {
 
-  if (!timestamp) return { iso: '', sort: 0 }
+  if (!timestamp)
+    return {
+      iso: '',
+      sort: 0,
+    }
 
-  let date: Date
-  try {
-    date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp)
-  } catch {
-    return { iso: '', sort: 0 }
-  }
-
-  if (Number.isNaN(date.getTime())) return { iso: '', sort: 0 }
+  const date = timestamp.toDate
+    ? timestamp.toDate()
+    : new Date(timestamp)
 
   return {
     iso: date.toISOString().split('T')[0],
@@ -180,26 +174,17 @@ export const formatFechaISO = (iso: string) => {
 }
 
 
-export const formatFechaHoraSolicitud = (valor: unknown) => {
-  if (!valor) return ''
+export const formatFechaHoraSolicitud = (valor: string) => {
 
-  const fecha = valor && typeof valor === 'object' && 'toDate' in valor
-    && typeof valor.toDate === 'function'
-    ? valor.toDate()
-    : valor instanceof Date
-      ? valor
-      : null
+  if (!valor)
+    return ''
 
-  if (fecha instanceof Date) {
-    if (Number.isNaN(fecha.getTime())) return ''
-    return `${String(fecha.getDate()).padStart(2, '0')}/${String(fecha.getMonth() + 1).padStart(2, '0')}/${fecha.getFullYear()} ${String(fecha.getHours()).padStart(2, '0')}:${String(fecha.getMinutes()).padStart(2, '0')}`
-  }
-
-  if (typeof valor !== 'string') return ''
   if (valor.includes('T')) {
-    const [fechaTexto, hora] = valor.split('T')
-    const [y, m, d] = fechaTexto.split('-')
+
+    const [fecha, hora] = valor.split('T')
+    const [y, m, d] = fecha.split('-')
     const hh = hora?.slice(0, 5) || ''
+
     return `${d}/${m}/${y} ${hh}`
   }
 
@@ -214,20 +199,18 @@ const reprogramacionResumen = (data: Record<string, any>) => {
     data.tipo_reprogramacion || ''
   )
 
-  const fechas = Array.isArray(data.fechas_reprogramacion)
-    ? data.fechas_reprogramacion.filter(Boolean)
-    : []
+  const fechas = (
+    data.fechas_reprogramacion || []
+  ).filter(Boolean)
+
 
   if (!fechas.length)
     return tipo || '—'
 
-  const primeraFecha =
-    typeof fechas[0] === 'string'
-      ? fechas[0]
-      : fechas[0]?.inicio
 
-  return `${tipo} · ${formatFechaHoraSolicitud(primeraFecha)}`
+  return `${tipo} · ${formatFechaHoraSolicitud(fechas[0])}`
 }
+
 
 
 export const mapDocSolicitud = (
@@ -374,7 +357,10 @@ export async function fetchSolicitudDocente(
   )
 }
 
-
+  export interface FechaReprogramacion {
+  inicio: string
+  fin: string
+} 
 
 export interface CrearSolicitudDocenteInput {
 
@@ -388,7 +374,7 @@ export interface CrearSolicitudDocenteInput {
   materia_label:string
   descripcion:string
   tipo_reprogramacion:string
-  fechas_reprogramacion: FechaReprogramacion[]
+  fechas_reprogramacion:string[]
   pdf_url?:string
 
 }
@@ -400,32 +386,18 @@ const validarMaximoDosSemanas = (
   fechaInicio: string,
   fechas: FechaReprogramacion[]
 ) => {
+  const inicio = new Date(fechaInicio);
 
-  const inicio = new Date(fechaInicio)
-
-  return fechas.every(fecha => {
-
-    const nuevaFecha = new Date(fecha.inicio)
+  return fechas.every((fecha) => {
+    const nuevaFecha = new Date(fecha.inicio);
 
     const diferencia =
-      (
-        nuevaFecha.getTime()
-        -
-        inicio.getTime()
-      )
-      /
-      (
-        1000 *
-        60 *
-        60 *
-        24
-      )
+      (nuevaFecha.getTime() - inicio.getTime()) /
+      (1000 * 60 * 60 * 24);
 
-    return diferencia <= 14
-
-  })
-
-}
+    return diferencia <= 14;
+  });
+};
 
 
 
@@ -659,46 +631,43 @@ export function eventosCalendarioDesdeSolicitud(
 
 
 
-sol.fechas_reprogramacion.forEach(
-  (f, i) => {
+  sol.fechas_reprogramacion.forEach(
+    (f,i)=>{
 
-    const fechaInicio =
-      typeof f === 'string'
-        ? f
-        : f?.inicio
+      const fecha =
+        fechaDeEvento(f)
 
-    const fecha =
-      fechaDeEvento(fechaInicio)
 
-    if (!fecha)
-      return
+      if(!fecha)
+        return
 
-    eventos.push({
 
-      id:
-        `${sol.id}-repro-${i}`,
+      eventos.push({
 
-      titulo:
-        `Extensión de encuentro · ${sol.materia}`,
+        id:
+          `${sol.id}-repro-${i}`,
 
-      fecha,
+        titulo:
+          `Extensión de encuentro · ${sol.materia}`,
 
-      tipo:
-        'solicitud',
+        fecha,
 
-      estado:
-        estadoCal,
+        tipo:
+          'solicitud',
 
-      descripcion:
-        `${sol.tipoReprogramacionLabel} · ${formatFechaHoraSolicitud(fechaInicio)}`,
+        estado:
+          estadoCal,
 
-      motivoRechazo:
-        '',
+        descripcion:
+          `${sol.tipoReprogramacionLabel} · ${formatFechaHoraSolicitud(f)}`,
 
-    })
+        motivoRechazo:
+          '',
 
-  }
-)
+      })
+
+    }
+  )
 
 
   return eventos
