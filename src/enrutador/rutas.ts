@@ -123,6 +123,10 @@ export const routes: RouteRecordRaw[] = [
     component: lazy(() => import("@/vistas/estudiante/EstudianteMaterias.vue")),
   },
   {
+ path:'/estudiante/mis-materias',
+ component: lazy(() => import("@/vistas/estudiante/EstudianteMisMaterias.vue")),
+},
+  {
     path: "/estudiante/ausentismos-docentes",
     component: lazy(
       () => import("@/vistas/estudiante/EstudianteAusentismosDocentes.vue"),

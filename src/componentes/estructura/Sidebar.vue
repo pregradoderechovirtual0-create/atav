@@ -92,6 +92,11 @@ const menuItems = computed(() => {
     { name: "Inicio", path: "/estudiante", icon: "home" },
     { name: "Mis materias", path: "/estudiante/materias", icon: "book" },
     {
+  name: "Mis encuentros",
+  path: "/estudiante/mis-materias",
+  icon: "video",
+    },
+    {
       name: "Ausentismos docentes",
       path: "/estudiante/ausentismos-docentes",
       icon: "calendar",
