@@ -175,6 +175,22 @@ onMounted(() => {
 
       </div>
 
+      <div class="meeting-icon">
+  <svg 
+    width="28" 
+    height="28" 
+    viewBox="0 0 24 24" 
+    fill="none"
+    stroke="currentColor"
+    stroke-width="2"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  >
+    <polygon points="23 7 16 12 23 17 23 7"></polygon>
+    <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+  </svg>
+</div>
+
 
 
 
@@ -653,9 +669,16 @@ onMounted(() => {
 
 }
 
-
-
-
+.meeting-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 16px;
+  background: #e8fff7;
+  color: #00a878;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 
 .modal-btn {
 
@@ -673,35 +696,15 @@ onMounted(() => {
   border-radius:12px;
 
   cursor:pointer;
-
   font-weight:600;
-
-
 }
-
-
-
 @media(max-width:768px){
-
-
 .encuentro-card{
-
   flex-direction:column;
-
   align-items:stretch;
-
 }
-
-
-
 .reunion-btn{
-
   width:100%;
-
 }
-
-
 }
-
-
 </style>

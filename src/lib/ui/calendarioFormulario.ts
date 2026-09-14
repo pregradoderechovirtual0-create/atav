@@ -11,6 +11,7 @@ export const HORARIOS_TARDE = ['14:00', '15:00', '16:00', '17:00']
 export interface CeldaCalendario {
   dia: number
   iso: string
+  vacio?: boolean
 }
 
 export const isoDesdePartes = (anio: number, mes: number, dia: number) =>
@@ -32,7 +33,13 @@ export const construirDiasCalendario = (
   const totalDias = new Date(anio, mes + 1, 0).getDate()
   const celdas: (CeldaCalendario | null)[] = []
 
-  for (let i = 0; i < primerDiaSemana; i++) celdas.push(null)
+  for (let i = 0; i < primerDiaSemana; i++) {
+  celdas.push({
+    dia: 0,
+    iso: '',
+    vacio: true,
+  })
+}
 
   for (let d = 1; d <= totalDias; d++) {
     const iso = isoDesdePartes(anio, mes, d)

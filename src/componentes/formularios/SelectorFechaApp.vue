@@ -61,14 +61,30 @@ watch(
   { immediate: true },
 )
 
-const diasCalendario = computed(() =>
-  construirDiasCalendario(
+watch(
+  () => props.min,
+  (valor) => {
+    if (valor) irAMesDe(valor)
+  },
+  { immediate: true },
+)
+
+watch(
+  () => props.max,
+  (valor) => {
+    if (!props.min && valor) irAMesDe(valor)
+  },
+  { immediate: true },
+)
+
+const diasCalendario = computed(() => {
+  return construirDiasCalendario(
     calMes.value,
     calAnio.value,
     fechaMinima.value,
     props.max,
-  ),
-)
+  );
+});
 
 const calAnterior = () => {
   if (calMes.value === 0) {

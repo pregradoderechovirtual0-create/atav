@@ -92,6 +92,11 @@ const menuItems = computed(() => {
     { name: "Inicio", path: "/estudiante", icon: "home" },
     { name: "Mis materias", path: "/estudiante/materias", icon: "book" },
     {
+      name: "Mis encuentros",
+      path: "/estudiante/mis-materias",
+      icon: "video",
+    },
+    {
       name: "Ausentismos docentes",
       path: "/estudiante/ausentismos-docentes",
       icon: "calendar",
@@ -390,6 +395,23 @@ watch(
                 <polyline points="14 2 14 8 20 8" />
                 <polyline points="9 15 11 17 15 13" />
               </svg>
+
+<svg
+  v-else-if="item.icon === 'video'"
+  width="18"
+  height="18"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <polygon points="23 7 16 12 23 17 23 7"></polygon>
+  <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+</svg>
+
+
               <svg
                 v-else-if="item.icon === 'folder'"
                 width="18"
@@ -403,6 +425,7 @@ watch(
                   d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"
                 />
               </svg>
+
               <svg
                 v-else-if="item.icon === 'settings'"
                 width="18"
