@@ -49,6 +49,7 @@ export interface SolicitudDirector {
   fechas_reprogramacion?: FechaReprogramacion[];
   tipo_ausentismo?: string;
   fecha_reprogramacion_seleccionada?: string;
+  fechas_reprogramacion_seleccionadas?: FechaReprogramacion[];
 }
 
 const tsSeconds = (ts: unknown): number => {
@@ -102,6 +103,12 @@ export function mapSnapSolicitudesDirector(
       tipo_ausentismo: data.tipo_ausentismo as string | undefined,
       tipo_reprogramacion: data.tipo_reprogramacion as string | undefined,
       fechas_reprogramacion: (data.fechas_reprogramacion as FechaReprogramacion[]) || [],
+      fechas_reprogramacion_seleccionadas:
+        (data.fechas_reprogramacion_seleccionadas as FechaReprogramacion[]) ||
+        undefined,
+      fecha_reprogramacion_seleccionada:
+        (data.fecha_reprogramacion_seleccionada as string | undefined) ||
+        undefined,
       pdf_url: String(data.pdf_url || ""),
     };
   });

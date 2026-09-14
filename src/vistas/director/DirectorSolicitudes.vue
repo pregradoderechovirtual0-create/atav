@@ -74,6 +74,7 @@ const confirmandoAccion = ref(false);
    SELECCIÓN DE FECHA DE REPROGRAMACIÓN
    ========================================================= */
 
+
 const fechasReproSeleccionadas = ref<string[]>([]);
 const errorFechaRepro = ref(false);
 
@@ -195,6 +196,28 @@ const fechasReprogramacionLista = (
       typeof fecha.fin === "string",
   );
 
+
+
+const alternarFechaReprogramacion = (
+  fechaInicio: string,
+  checked: boolean,
+) => {
+  if (checked) {
+    if (!fechasReproSeleccionadas.value.includes(fechaInicio)) {
+      fechasReproSeleccionadas.value = [
+        ...fechasReproSeleccionadas.value,
+        fechaInicio,
+      ];
+    }
+  } else {
+    fechasReproSeleccionadas.value = fechasReproSeleccionadas.value.filter(
+      (f) => f !== fechaInicio,
+    );
+  }
+
+  errorFechaRepro.value = false;
+};
+
 /* =========================================================
    MODAL DE DETALLE
    ========================================================= */
@@ -202,13 +225,13 @@ const fechasReprogramacionLista = (
 const verSolicitud = (sol: any) => {
   solicitudSeleccionada.value = sol;
 
+  // El estado de selección vive en el detalle interactivo.
+  // Al abrir una nueva solicitud, se limpia el arreglo para
+  // evitar contaminación entre formularios distintos.
+  fechasReproSeleccionadas.value = [];
+
   const fechas = fechasReprogramacionLista(sol);
 
-  /*
-   * Cargamos las fechas previamente seleccionadas.
-   * Se guarda el inicio como identificador porque el
-   * objeto completo se conserva en fechas_reprogramacion.
-   */
   if (
     Array.isArray(sol.fechas_reprogramacion_seleccionadas) &&
     sol.fechas_reprogramacion_seleccionadas.length
@@ -216,23 +239,24 @@ const verSolicitud = (sol: any) => {
     fechasReproSeleccionadas.value =
       sol.fechas_reprogramacion_seleccionadas
         .map((f: any) => f?.inicio)
-        .filter((f: any): f is string => typeof f === "string");
+        .filter(
+          (f: any): f is string =>
+            typeof f === "string",
+        );
   } else if (sol.fecha_reprogramacion_seleccionada) {
-    /*
-     * Compatibilidad con solicitudes antiguas que solamente
-     * tienen una fecha seleccionada.
-     */
+    // Compatibilidad con solicitudes antiguas
     fechasReproSeleccionadas.value = [
       sol.fecha_reprogramacion_seleccionada,
     ];
-  } else if (sol.tipo === "inasistencia" && sol.estado === "Pendiente") {
-    /*
-     * Si solo existe una propuesta, se selecciona automáticamente.
-     */
-    fechasReproSeleccionadas.value =
-      fechas.length === 1 ? [fechas[0].inicio] : [];
-  } else {
-    fechasReproSeleccionadas.value = [];
+  } else if (
+    sol.tipo === "inasistencia" &&
+    sol.estado === "Pendiente" &&
+    fechas.length === 1
+  ) {
+    // Una sola opción: selección automática
+    fechasReproSeleccionadas.value = [
+      fechas[0].inicio,
+    ];
   }
 
   errorFechaRepro.value = false;
@@ -271,40 +295,19 @@ const pedirConfirmacion = (
   errorMotivoRechazo.value = false;
   errorFechaRepro.value = false;
 
-  const fechas = fechasReprogramacionLista(sol);
-
   if (accion === "aprobar" && sol.tipo === "inasistencia") {
-    /*
-     * Recuperar selección existente.
-     */
-    if (
-      Array.isArray(sol.fechas_reprogramacion_seleccionadas) &&
-      sol.fechas_reprogramacion_seleccionadas.length
-    ) {
-      fechasReproSeleccionadas.value =
-        sol.fechas_reprogramacion_seleccionadas
-          .map((f: any) => f?.inicio)
-          .filter((f: any): f is string => typeof f === "string");
-    } else if (sol.fecha_reprogramacion_seleccionada) {
-      /*
-       * Compatibilidad con registros antiguos.
-       */
-      fechasReproSeleccionadas.value = [
-        sol.fecha_reprogramacion_seleccionada,
-      ];
-    } else if (fechas.length === 1) {
-      /*
-       * Una única propuesta: selección automática.
-       */
-      fechasReproSeleccionadas.value = [fechas[0].inicio];
-    } else {
-      /*
-       * Varias propuestas: el director debe seleccionar.
-       */
-      fechasReproSeleccionadas.value = [];
+    // La fuente de verdad es la selección hecha en el detalle
+    // interactivo del primer menú. Si la selección no existe
+    // y la solicitud solo propone una fecha, se materializa
+    // esa única fecha para permitir la aprobación del caso
+    // recién creado sin volver a convertir el documento en
+    // la fuente de selección.
+    if (!fechasReproSeleccionadas.value.length) {
+      const fechas = fechasReprogramacionLista(sol);
+      if (fechas.length === 1) {
+        fechasReproSeleccionadas.value = [fechas[0].inicio];
+      }
     }
-  } else {
-    fechasReproSeleccionadas.value = [];
   }
 
   modalConfirmVisible.value = true;
@@ -323,10 +326,10 @@ const intentarConfirmar = () => {
   if (
   requiereSeleccionFecha.value &&
   fechasReproSeleccionadas.value.length === 0
-  ) {
+) {
   errorFechaRepro.value = true;
   return;
-  }
+}
 
   errorMotivoRechazo.value = false;
   errorFechaRepro.value = false;
@@ -371,11 +374,14 @@ const confirmarAccion = async () => {
        1. ACTUALIZAR FIRESTORE
        ===================================================== */
 
-       const fechasSeleccionadas =
-  fechasReprogramacionLista(solicitudAccion.value).filter(
-    (fecha: any) =>
-      fechasReproSeleccionadas.value.includes(fecha.inicio),
-  );
+    const fechasSeleccionadas =
+  accionPendiente.value === "aprobar" &&
+  solicitudAccion.value.tipo === "inasistencia"
+    ? fechasReprogramacionLista(solicitudAccion.value).filter(
+        (fecha: any) =>
+          fechasReproSeleccionadas.value.includes(fecha.inicio),
+      )
+    : [];
 
     const payload: Record<string, unknown> = {
       estado: estadoGuardar,
@@ -392,9 +398,10 @@ const confirmarAccion = async () => {
             }
           : {}),
 
-        ...(accionPendiente.value === "aprobar" && fechaReproSeleccionada.value
+        ...(accionPendiente.value === "aprobar" && fechasSeleccionadas.length
           ? {
-              fecha_reprogramacion_seleccionada: fechaReproSeleccionada.value,
+              fechas_reprogramacion_seleccionadas: fechasSeleccionadas,
+              fecha_reprogramacion_seleccionada: fechasSeleccionadas[0].inicio,
             }
           : {}),
       }),
@@ -405,10 +412,17 @@ const confirmarAccion = async () => {
       payload.motivo_rechazo = motivoRechazo.value.trim();
     }
 
-    /* Fecha definitiva */
-    if (accionPendiente.value === "aprobar" && fechaReproSeleccionada.value) {
-      payload.fecha_reprogramacion_seleccionada = fechaReproSeleccionada.value;
-    }
+   if (
+  accionPendiente.value === "aprobar" &&
+  solicitudAccion.value.tipo === "inasistencia" &&
+  fechasSeleccionadas.length
+) {
+  payload.fechas_reprogramacion_seleccionadas = fechasSeleccionadas;
+
+  // Compatibilidad con código anterior
+  payload.fecha_reprogramacion_seleccionada =
+    fechasSeleccionadas[0].inicio;
+}
 
     await updateDoc(doc(db, coleccion, solicitudAccion.value.id), payload);
 
@@ -427,9 +441,11 @@ const confirmarAccion = async () => {
         solicitudes.value[idx].motivo_rechazo = motivoRechazo.value.trim();
       }
 
-      if (accionPendiente.value === "aprobar" && fechaReproSeleccionada.value) {
+      if (accionPendiente.value === "aprobar" && fechasSeleccionadas.length) {
+        (solicitudes.value[idx] as any).fechas_reprogramacion_seleccionadas =
+          fechasSeleccionadas;
         (solicitudes.value[idx] as any).fecha_reprogramacion_seleccionada =
-          fechaReproSeleccionada.value;
+          fechasSeleccionadas[0].inicio;
       }
     }
 
@@ -443,9 +459,11 @@ const confirmarAccion = async () => {
     ) {
       solicitudSeleccionada.value.estado = nuevoEstado;
 
-      if (accionPendiente.value === "aprobar" && fechaReproSeleccionada.value) {
+      if (accionPendiente.value === "aprobar" && fechasSeleccionadas.length) {
+        solicitudSeleccionada.value.fechas_reprogramacion_seleccionadas =
+          fechasSeleccionadas;
         solicitudSeleccionada.value.fecha_reprogramacion_seleccionada =
-          fechaReproSeleccionada.value;
+          fechasSeleccionadas[0].inicio;
       }
 
       if (accionPendiente.value === "rechazar") {
@@ -482,11 +500,13 @@ const confirmarAccion = async () => {
 
           if (
             solicitudAccion.value.tipo === "inasistencia" &&
-            fechaReproSeleccionada.value
+            fechasSeleccionadas.length
           ) {
-            mensajeNotificacion += `\n\nLa fecha de reprogramación seleccionada es: ${formatFechaHoraSolicitud(
-              fechaReproSeleccionada.value,
-            )}.`;
+            const fechasTexto = fechasSeleccionadas
+              .map((f: any) => formatFechaHoraSolicitud(f.inicio))
+              .join("; ");
+
+            mensajeNotificacion += `\n\nLas fechas de reprogramación seleccionadas son: ${fechasTexto}.`;
           }
 
           if (mensajeAprobacion.value.trim()) {
@@ -1231,58 +1251,24 @@ const normalizarNombre = (nombre: unknown) =>
                   class="repro-opciones"
                 >
                   <div class="repro-opciones-title">
-                    <span>
-                      {{
-                        solicitudSeleccionada.estado === "Pendiente"
-                          ? "Selecciona una fecha"
-                          : "Fechas propuestas"
-                      }}
-                    </span>
-
-                    <span
-                      v-if="solicitudSeleccionada.estado === 'Pendiente'"
-                      class="repro-required"
-                    >
-                      Selección requerida
-                    </span>
+                    <span>Fechas propuestas</span>
                   </div>
 
-                  <!--
-                    IMPORTANTE:
-                    Cada opción ahora es un botón.
-                    Esto permite seleccionar directamente
-                    la fecha propuesta.
-                  -->
-
-                  <button
+                  <label
                     v-for="(fecha, idx) in fechasReprogramacionLista(
                       solicitudSeleccionada,
                     )"
                     :key="idx"
-                    type="button"
-                    :disabled="solicitudSeleccionada.estado !== 'Pendiente'"
-                    :class="[
-                      'repro-opcion',
-                      {
-                        'repro-opcion--elegida':
-                          fechaReproSeleccionada === fecha,
-                        'repro-opcion--disabled':
-                          solicitudSeleccionada.estado !== 'Pendiente',
-                      },
-                    ]"
-                    @click="seleccionarFechaReprogramacion(fecha)"
+                    class="repro-opcion"
                   >
-                    <span
-                      class="repro-radio"
-                      :class="{
-                        checked: fechaReproSeleccionada === fecha,
-                      }"
-                    >
-                      <span
-                        v-if="fechaReproSeleccionada === fecha"
-                        class="repro-radio-dot"
-                      />
-                    </span>
+                    <input
+                      type="checkbox"
+                      :checked="fechasReproSeleccionadas.includes(fecha.inicio)"
+                      @change="alternarFechaReprogramacion(
+                        fecha.inicio,
+                        ($event.target as HTMLInputElement).checked,
+                      )"
+                    />
 
                     <span class="repro-opcion-content">
                       <span class="repro-opcion-num">
@@ -1295,12 +1281,20 @@ const normalizarNombre = (nombre: unknown) =>
                     </span>
 
                     <span
-                      v-if="fechaReproSeleccionada === fecha"
+                      v-if="
+                        solicitudSeleccionada.estado !== 'Pendiente' &&
+                        (
+                          solicitudSeleccionada.fechas_reprogramacion_seleccionadas
+                            ?.some((f: any) => f?.inicio === fecha.inicio) ||
+                          solicitudSeleccionada.fecha_reprogramacion_seleccionada ===
+                            fecha.inicio
+                        )
+                      "
                       class="repro-opcion-badge"
                     >
                       Seleccionada
                     </span>
-                  </button>
+                  </label>
                 </div>
 
                 <p v-else class="detail-text detail-text--muted">
@@ -1557,62 +1551,35 @@ const normalizarNombre = (nombre: unknown) =>
               </div>
 
               <!-- =================================================
-                   SELECCIÓN DE FECHA
+                   RESUMEN DE FECHAS SELECCIONADAS
                    ================================================= -->
 
               <div
                 v-if="
                   accionPendiente === 'aprobar' &&
                   solicitudAccion?.tipo === 'inasistencia' &&
-                  fechasReprogramacionLista(solicitudAccion).length
+                  fechasReproSeleccionadas.length
                 "
                 class="form-group"
               >
                 <label class="detail-label">
-                  Fecha de reprogramación
-                  <span v-if="requiereSeleccionFecha" style="color: #dc2626">
-                    *
-                  </span>
+                  Fechas aprobadas
                 </label>
 
-                <div
-                  class="repro-opciones-select"
-                  :class="{
-                    'repro-opciones-select--error': errorFechaRepro,
-                  }"
-                >
-                  <label
-                    v-for="(fecha, idx) in fechasReprogramacionLista(
-                      solicitudAccion,
-                    )"
-                    :key="idx"
-                    class="repro-opcion-radio"
-                    :class="{
-                      selected: fechaReproSeleccionada === fecha,
-                    }"
+                <ul class="repro-fechas-list">
+                  <li
+                    v-for="(inicio, idx) in fechasReproSeleccionadas"
+                    :key="inicio"
+                    class="repro-fecha-item"
                   >
-                    <input
-                    type="checkbox"
-                    :value="fecha.inicio"
-                    v-model="fechasReproSeleccionadas"
-                    @change="errorFechaRepro = false"
-/>
-
-                    <span class="repro-opcion-radio-label">
-                      <span class="repro-opcion-num">
-                        Opción {{ idx + 1 }}
-                      </span>
-
-                      <span class="repro-opcion-fecha">
-                        {{ formatFechaHoraSolicitud(fecha) }}
-                      </span>
+                    <span class="repro-opcion-num">
+                      Opción {{ idx + 1 }}
                     </span>
-                  </label>
-                </div>
-
-                <p v-if="errorFechaRepro" class="motivo-error">
-                  Debes seleccionar una de las fechas propuestas.
-                </p>
+                    <span class="repro-opcion-fecha">
+                      {{ formatFechaHoraSolicitud(inicio) }}
+                    </span>
+                  </li>
+                </ul>
               </div>
 
               <div
