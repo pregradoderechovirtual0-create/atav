@@ -1,60 +1,39 @@
 <script setup lang="ts">
+
 import { computed, ref } from "vue";
 import { useNotificaciones } from "@/composables/useNotificaciones";
 import type { NotificacionData } from "@/lib/dominio/notificaciones";
+
 import {
-  labelTipoAusentismo,
-  labelTipoReprogramacion,
+ labelTipoAusentismo,
+ labelTipoReprogramacion,
 } from "@/lib/solicitudes/docenteSolicitudes";
 
-const { notificaciones, loading: cargando, marcarLeida } = useNotificaciones();
+
+const { 
+ notificaciones,
+ loading: cargando,
+ marcarLeida
+} = useNotificaciones();
+
+
 const busqueda = ref("");
+
 const filtroActivo = ref<"todos" | "no-leidos">("todos");
-const nombreEstudiante = ref(localStorage.getItem("nombre")?.split(" ")[0] || "estudiante");
 
-const avisos = computed(() => notificaciones.value.filter(
-  (notificacion) => notificacion.tipo === "inasistencia_docente",
-));
 
-const avisosFiltrados = computed(() => {
-  const texto = busqueda.value.trim().toLocaleLowerCase();
-  return avisos.value.filter((aviso) => {
-    const coincideTexto = !texto || [aviso.titulo, aviso.mensaje, aviso.materiaCodigo]
-      .some((valor) => valor.toLocaleLowerCase().includes(texto));
-    const coincideFiltro = filtroActivo.value === "todos"
-      || (filtroActivo.value === "no-leidos" && !aviso.leida);
-    return coincideTexto && coincideFiltro;
-  });
-});
+const nombreEstudiante = ref(
+ localStorage.getItem("nombre")?.split(" ")[0] || "estudiante"
+);
 
-const filtros = computed(() => [
-  { id: "todos" as const, label: "Todos", count: avisos.value.length },
-  { id: "no-leidos" as const, label: "No leídos", count: avisos.value.filter((aviso) => !aviso.leida).length },
-]);
 
-const formatFecha = (fecha: string) => {
-  if (!fecha) return "Fecha no disponible";
-  const [anio, mes, dia] = fecha.split("-");
-  return `${dia}/${mes}/${anio}`;
-};
+const avisos = computed(() =>
+ notificaciones.value.filter(
+   (notificacion)=>
+    notificacion.tipo === "inasistencia_docente"
+ )
+);
 
-const formatRango = (inicio: string, fin: string) => {
-  if (!inicio) return "Fecha no disponible";
-  if (!fin || inicio === fin) return formatFecha(inicio);
-  return `${formatFecha(inicio)} al ${formatFecha(fin)}`;
-};
-
-const abrirAviso = async (aviso: NotificacionData) => {
-  await marcarLeida(aviso.id);
-};
-
-const marcarAvisosLeidos = async () => {
-  await Promise.all(
-    avisos.value
-      .filter((aviso) => !aviso.leida)
-      .map((aviso) => marcarLeida(aviso.id)),
-  );
-};
 
 </script>
 
@@ -127,7 +106,9 @@ const marcarAvisosLeidos = async () => {
   </div>
 </template>
 
+
 <style scoped>
+
 .ausentismos-page { display: flex; flex-direction: column; gap: 24px; }
 .section-heading { display: flex; justify-content: space-between; align-items: end; gap: 16px; }
 .section-heading h1 { margin: 4px 0 0; color: var(--color-text); font-size: 32px; }
@@ -145,4 +126,5 @@ const marcarAvisosLeidos = async () => {
 .empty-state { display: flex; align-items: center; justify-content: center; min-height: 150px; padding: 32px 20px 52px; text-align: center; color: #b53d3d; font-size: 14px; font-weight: 600; }
 .avisos-list { display: flex; flex-direction: column; }.aviso-card { display: flex; align-items: flex-start; gap: 14px; padding: 18px 20px; border-bottom: 1px solid var(--color-border-light); cursor: pointer; }.aviso-card:last-child { border-bottom: 0; }.aviso-card:hover { background: var(--color-subtle); }.aviso-no-leido { background: var(--color-info-bg); }.aviso-icon { display: flex; align-items: center; justify-content: center; width: 38px; height: 38px; flex-shrink: 0; border-radius: var(--radius); background: var(--color-subtle); color: var(--color-accent); }.aviso-info { flex: 1; min-width: 0; }.aviso-title-row { display: flex; align-items: center; gap: 8px; }.aviso-title-row h3 { margin: 0; font-size: 14px; }.nuevo { padding: 3px 7px; border-radius: 999px; background: var(--color-accent); color: white; font-size: 10px; font-weight: 700; }.aviso-mensaje, .aviso-meta { margin: 5px 0 0; color: var(--color-text-secondary); font-size: 13px; line-height: 1.45; }.aviso-fecha { display: block; margin-top: 7px; color: var(--color-text-muted); font-size: 11px; }.estado-aviso { flex-shrink: 0; padding: 4px 8px; border-radius: 999px; background: var(--color-warning-bg); color: var(--color-warning); font-size: 11px; font-weight: 600; }.estado-aviso.leido { background: var(--color-subtle); color: var(--color-text-muted); }
 @media (max-width: 760px) { .section-heading, .panel-heading { align-items: stretch; flex-direction: column; }.stats-grid { grid-template-columns: 1fr; }.panel-tools { flex-direction: column; align-items: stretch; }.search-box { width: 100%; }.aviso-card { padding: 16px; } }
+
 </style>
