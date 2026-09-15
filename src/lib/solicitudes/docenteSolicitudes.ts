@@ -379,24 +379,42 @@ export interface CrearSolicitudDocenteInput {
 // NUEVA VALIDACIÓN
 const validarMaximoDosSemanas = (
   fechaInicio: string,
-  fechas: string[]
+  fechas: any[]
 ) => {
 
   const inicio = new Date(fechaInicio + "T00:00:00");
 
   return fechas.every((fecha) => {
 
-    const nuevaFecha = new Date(fecha.split("T")[0] + "T00:00:00");
+    let valorFecha = "";
+
+    if (typeof fecha === "string") {
+      valorFecha = fecha;
+    } 
+    else if (fecha?.inicio) {
+      valorFecha = fecha.inicio;
+    } 
+    else if (fecha?.toDate) {
+      valorFecha = fecha.toDate().toISOString();
+    }
+
+    if (!valorFecha) {
+      return false;
+    }
+
+    const nuevaFecha = new Date(
+      valorFecha.split("T")[0] + "T00:00:00"
+    );
 
     let diasValidos = 0;
-    const fechaActual = new Date(inicio);
+    const actual = new Date(inicio);
 
-    while (fechaActual < nuevaFecha) {
+    while (actual < nuevaFecha) {
 
-      fechaActual.setDate(fechaActual.getDate() + 1);
+      actual.setDate(actual.getDate() + 1);
 
-      // 0 = domingo
-      if (fechaActual.getDay() !== 0) {
+      // Domingo no cuenta
+      if (actual.getDay() !== 0) {
         diasValidos++;
       }
     }

@@ -144,18 +144,8 @@ onMounted(async () => {
 });
 
 useRefreshOnVisible(() => {
-
-  const unsubscribe = auth.onAuthStateChanged((user) => {
-
-    if (user?.uid) {
-      console.log("UID docente:", user.uid);
-      cargarSolicitudes(user.uid);
-    }
-
-  });
-
-  return unsubscribe;
-
+  const uid = auth.currentUser?.uid;
+  if (uid) cargarSolicitudes(uid);
 });
 
 const stats = computed(() => ({
