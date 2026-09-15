@@ -34,7 +34,7 @@ export interface CrearNotificacionInput {
   titulo: string;
   mensaje: string;
   tipo?: TipoNotificacion;
-  ruta?: string | null;
+  ruta?: string;
   materia_codigo?: string;
 }
 
@@ -110,8 +110,10 @@ export const crearNotificacion = async (input: CrearNotificacionInput) => {
     mensaje: input.mensaje,
     tipo: input.tipo || "info",
     leida: false,
-    ruta: input.ruta ?? null,
-    ...(input.materia_codigo ? { materia_codigo: input.materia_codigo } : {}),
+    ruta: input.ruta ?? "/docente/notificaciones",
+    ...(input.materia_codigo
+      ? { materia_codigo: input.materia_codigo }
+      : {}),
     fecha_creacion: serverTimestamp(),
   });
 };
