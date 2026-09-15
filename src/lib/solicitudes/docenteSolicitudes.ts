@@ -174,9 +174,9 @@ export const formatFechaISO = (iso: string) => {
 }
 
 
-export const formatFechaHoraSolicitud = (valor: string) => {
+export const formatFechaHoraSolicitud = (valor: any) => {
 
-  if (!valor)
+  if (!valor || typeof valor !== 'string')
     return ''
 
   if (valor.includes('T')) {
@@ -357,10 +357,7 @@ export async function fetchSolicitudDocente(
   )
 }
 
-  export interface FechaReprogramacion {
-  inicio: string
-  fin: string
-} 
+export type FechaReprogramacion = string;
 
 export interface CrearSolicitudDocenteInput {
 
@@ -384,12 +381,14 @@ export interface CrearSolicitudDocenteInput {
 // NUEVA VALIDACIÓN
 const validarMaximoDosSemanas = (
   fechaInicio: string,
-  fechas: FechaReprogramacion[]
+  fechas: string[]
 ) => {
+
   const inicio = new Date(fechaInicio);
 
   return fechas.every((fecha) => {
-    const nuevaFecha = new Date(fecha.inicio);
+
+    const nuevaFecha = new Date(fecha);
 
     const diferencia =
       (nuevaFecha.getTime() - inicio.getTime()) /
