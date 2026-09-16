@@ -512,14 +512,21 @@ const tipoColorParcial: Record<string, string> = {
 
       </div>
 
-<button 
-  :class="materia.enlace ? 
-  'materia-btn activo' : 
-  'materia-btn disabled'"
+<button
+  type="button"
+  :class="[
+    'materia-btn',
+    materia.enlace_reunion ? 'activo' : 'disabled'
+  ]"
+  @click="
+    materia.enlace_reunion &&
+    window.open(materia.enlace_reunion,'_blank')
+  "
 >
-  {{ materia.enlace ? 
-  'Ingresar reunión' : 
-  'Sin enlace disponible'
+  {{
+    materia.enlace_reunion
+      ? 'Ingresar reunión'
+      : 'Sin enlace disponible'
   }}
 </button>
 
@@ -828,6 +835,32 @@ const tipoColorParcial: Record<string, string> = {
 </template>
 
 <style scoped>
+
+.materia-btn {
+  border:none;
+  padding:12px 22px;
+  border-radius:12px;
+  font-weight:700;
+  cursor:pointer;
+  transition:.2s;
+}
+
+.materia-btn.activo {
+  background:#087f6e;
+  color:white;
+  box-shadow:0 8px 18px rgba(8,127,110,.25);
+}
+
+.materia-btn.activo:hover {
+  background:#115e59;
+  transform:translateY(-2px);
+}
+
+.materia-btn.disabled {
+  background:#e2e8f0;
+  color:#64748b;
+  cursor:not-allowed;
+}
 
 .reunion-btn {
   border:none;
