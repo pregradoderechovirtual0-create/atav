@@ -495,9 +495,13 @@ const tipoColorParcial: Record<string, string> = {
 
       <div class="materia-suscrita-info">
 
-        <strong>
-          {{ materia.materia_label }}
-        </strong>
+        <span class="materia-codigo">
+{{ materia.materia_codigo }}
+</span>
+
+<strong>
+{{ materia.materia_label }}
+</strong>
 
         <span>
           Profesor:
@@ -508,12 +512,16 @@ const tipoColorParcial: Record<string, string> = {
 
       </div>
 
-
-      <button
-        class="materia-suscrita-action"
-      >
-        Ingresar reunión
-      </button>
+<button 
+  :class="materia.enlace ? 
+  'materia-btn activo' : 
+  'materia-btn disabled'"
+>
+  {{ materia.enlace ? 
+  'Ingresar reunión' : 
+  'Sin enlace disponible'
+  }}
+</button>
 
 
     </div>
@@ -542,6 +550,20 @@ const tipoColorParcial: Record<string, string> = {
         General.
       </span>
     </div>
+
+    <div class="materia-icon">
+  <svg
+    width="22"
+    height="22"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    stroke-width="2"
+  >
+    <path d="M23 7l-7 5 7 5V7z"/>
+    <rect x="1" y="5" width="15" height="14" rx="2"/>
+  </svg>
+</div>
 
     <div class="main-grid">
       <div class="card card-main" id="mis-solicitudes">
@@ -806,6 +828,83 @@ const tipoColorParcial: Record<string, string> = {
 </template>
 
 <style scoped>
+
+.reunion-btn {
+  border:none;
+  border-radius:14px;
+  padding:14px 26px;
+  background:#087f6e;
+  color:white;
+  font-weight:700;
+  font-size:14px;
+  box-shadow:0 8px 18px rgba(8,127,110,.25);
+}
+
+.reunion-btn.disabled {
+  background:#e2e8f0;
+  color:#64748b;
+  box-shadow:none;
+}
+
+.materias-suscritas {
+ padding-bottom:20px;
+}
+
+.materia-suscrita-row {
+ display:flex;
+ align-items:center;
+ gap:16px;
+ padding:18px 20px;
+ border-bottom:1px solid var(--color-border-light);
+}
+
+.materia-icon {
+ width:44px;
+ height:44px;
+ border-radius:12px;
+ background:#ecfdf5;
+ color:#10b981;
+ display:flex;
+ align-items:center;
+ justify-content:center;
+}
+
+.materia-suscrita-info {
+ flex:1;
+ display:flex;
+ flex-direction:column;
+ gap:5px;
+}
+
+.materia-codigo {
+ font-size:11px;
+ color:#2563eb;
+ font-weight:600;
+}
+
+.materia-suscrita-info strong {
+ font-size:15px;
+}
+
+.materia-suscrita-info span:last-child {
+ font-size:13px;
+ color:var(--color-text-muted);
+}
+
+.materia-suscrita-action {
+ border:none;
+ padding:10px 18px;
+ border-radius:10px;
+ background:#0f766e;
+ color:white;
+ font-weight:600;
+ cursor:pointer;
+}
+
+.materia-suscrita-action:hover {
+ background:#115e59;
+}
+
 .estudiante-dashboard {
   display: flex;
   flex-direction: column;
