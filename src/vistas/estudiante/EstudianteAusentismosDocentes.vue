@@ -9,6 +9,8 @@ import {
  labelTipoReprogramacion,
 } from "@/lib/solicitudes/docenteSolicitudes";
 
+export type TipoNotificacion = 
+"success" | "info" | "warning" | "error" | "inasistencia_docente";
 
 const { 
  notificaciones,
@@ -26,6 +28,31 @@ const nombreEstudiante = ref(
  localStorage.getItem("nombre")?.split(" ")[0] || "estudiante"
 );
 
+const filtros = computed(() => [
+  {
+    id: "todos",
+    label: "Todos",
+    count: avisos.value.length,
+  },
+  {
+    id: "no-leidos",
+    label: "No leídos",
+    count: avisos.value.filter((aviso) => !aviso.leida).length,
+  },
+]);
+
+const avisosFiltrados = computed(() => {
+  const texto = busqueda.value.toLowerCase();
+
+  return avisos.value.filter((aviso) => {
+    return (
+      !texto ||
+      aviso.titulo.toLowerCase().includes(texto) ||
+      aviso.mensaje.toLowerCase().includes(texto) ||
+      aviso.materiaCodigo.toLowerCase().includes(texto)
+    );
+  });
+});
 
 const avisos = computed(() =>
  notificaciones.value.filter(
