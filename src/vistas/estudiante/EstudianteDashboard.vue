@@ -91,6 +91,15 @@ const accionesRapidas = [
   },
 ];
 
+const abrirReunion = (materia: SuscripcionMateria) => {
+  if (materia.enlace_reunion) {
+    window.open(
+      materia.enlace_reunion,
+      "_blank"
+    );
+  }
+};
+
 const cargarMateriasSuscritas = async (uid:string) => {
   try {
     materiasSuscritas.value =
@@ -478,6 +487,20 @@ const tipoColorParcial: Record<string, string> = {
 
     <section class="card materias-suscritas">
 
+<div class="materia-icon">
+  <svg
+    width="22"
+    height="22"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    stroke-width="2"
+  >
+    <path d="M23 7l-7 5 7 5V7z"/>
+    <rect x="1" y="5" width="15" height="14" rx="2"/>
+  </svg>
+</div>
+
 <div class="card-header">
   <div>
     <h2>Mis materias suscritas</h2>
@@ -518,10 +541,7 @@ const tipoColorParcial: Record<string, string> = {
     'materia-btn',
     materia.enlace_reunion ? 'activo' : 'disabled'
   ]"
-  @click="
-    materia.enlace_reunion &&
-    window.open(materia.enlace_reunion,'_blank')
-  "
+  @click="abrirReunion(materia)"
 >
   {{
     materia.enlace_reunion
@@ -557,20 +577,6 @@ const tipoColorParcial: Record<string, string> = {
         General.
       </span>
     </div>
-
-    <div class="materia-icon">
-  <svg
-    width="22"
-    height="22"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    stroke-width="2"
-  >
-    <path d="M23 7l-7 5 7 5V7z"/>
-    <rect x="1" y="5" width="15" height="14" rx="2"/>
-  </svg>
-</div>
 
     <div class="main-grid">
       <div class="card card-main" id="mis-solicitudes">
