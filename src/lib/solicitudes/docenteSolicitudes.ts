@@ -326,9 +326,6 @@ export async function fetchSolicitudesDocente(
     )
 }
 
-
-
-
 export async function fetchSolicitudDocente(
   id: string,
   uid: string
@@ -372,6 +369,7 @@ export async function fetchSolicitudDocente(
     data
   )
 }
+
 export type FechaReprogramacion = string;
 
 export interface CrearSolicitudDocenteInput {

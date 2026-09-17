@@ -49,6 +49,7 @@ const modalConfirmVisible = ref(false)
 const accionPendiente = ref<'aprobar' | 'rechazar' | null>(null)
 const solicitudAccion = ref<any>(null)
 const motivoRechazo = ref('')
+const mensajeDirector = ref('')
 const errorMotivoRechazo = ref(false)
 const confirmandoAccion = ref(false)
 const opcionReprogramacionSeleccionada = ref<any>(null)
@@ -136,6 +137,7 @@ const pedirConfirmacion = (sol: any, accion: 'aprobar' | 'rechazar') => {
   solicitudAccion.value = sol
   accionPendiente.value = accion
   motivoRechazo.value = ''
+  mensajeDirector.value = ''
   errorMotivoRechazo.value = false
   modalConfirmVisible.value = true
 }
@@ -174,7 +176,11 @@ const estadoGuardar = nuevoEstado.toLowerCase()
         ...(accionPendiente.value === 'rechazar' ? { motivo: motivoRechazo.value.trim() } : {}),
       }),
     }
-  
+
+if (mensajeDirector.value.trim()) {
+  payload.mensaje_director = mensajeDirector.value.trim()
+}  
+
 if (accionPendiente.value === 'rechazar') {
 
   payload.motivo_rechazo = motivoRechazo.value.trim()
@@ -235,7 +241,8 @@ Fin: ${formatFechaHoraSolicitud(opcionReprogramacionSeleccionada.value.fin)}
 }
 
 Mensaje adicional:
-${solicitudAccion.value.descripcion || '—'}`
+
+${mensajeDirector.value || '—'}`
     : `Tu solicitud de ${tipoSolicitud.toLowerCase()} para la materia ${solicitudAccion.value.materia} fue rechazada.
 
 Motivo: ${motivoRechazo.value}`,
@@ -654,8 +661,12 @@ const fechasReprogramacionLista = (sol: SolicitudDirector) =>
 <div
  v-for="(fecha, idx) in fechasReprogramacionLista(solicitudSeleccionada)"
  :key="idx"
- class="repro-opcion"
- @click="opcionReprogramacionSeleccionada = fecha"
+class="repro-opcion"
+:class="{
+  'repro-opcion--seleccionada':
+  opcionReprogramacionSeleccionada?.inicio === fecha.inicio
+}"
+@click="opcionReprogramacionSeleccionada = fecha"
 >
                     <span class="repro-opcion-num">Opción {{ idx + 1 }}</span>
                     <span class="repro-opcion-fecha">
@@ -796,6 +807,22 @@ Fin:
                 <strong>{{ accionPendiente === 'aprobar' ? 'aprobar' : 'rechazar' }}</strong>
                 la solicitud de <strong>{{ solicitudAccion?.nombre }}</strong>?
               </p>
+
+<div v-if="accionPendiente === 'aprobar'" class="form-group">
+
+  <label class="detail-label">
+    Mensaje adicional (opcional)
+  </label>
+
+  <textarea
+    v-model="mensajeDirector"
+    class="motivo-textarea"
+    rows="3"
+    placeholder="Escribe un mensaje para el docente..."
+  ></textarea>
+
+</div>
+
               <div v-if="accionPendiente === 'rechazar'" class="form-group">
                 <label class="detail-label">Motivo de rechazo <span style="color:#dc2626">*</span></label>
                 <textarea
@@ -805,7 +832,7 @@ Fin:
                   rows="3"
                   placeholder="Escribe el motivo del rechazo para notificar al estudiante..."
                   @input="errorMotivoRechazo = false"
-                />
+                ></textarea>
                 <p v-if="errorMotivoRechazo" class="motivo-error">
                   Primero debes escribir el motivo del rechazo.
                 </p>
@@ -847,6 +874,28 @@ Fin:
 </template>
 
 <style scoped>
+
+.repro-opcion {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  background: var(--color-background);
+  border: 1px solid var(--color-border-light);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.repro-opcion:hover {
+  border-color: var(--color-primary);
+}
+
+.repro-opcion--seleccionada {
+  border: 2px solid var(--color-primary);
+  background: #eef2ff;
+}
+
 .solicitudes-page { display: flex; flex-direction: column; gap: 20px; }
 
 .page-header { display: flex; align-items: center; justify-content: space-between; }
@@ -1086,15 +1135,7 @@ Fin:
   gap: 8px;
   margin-top: 4px;
 }
-.repro-opcion {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 14px;
-  border-radius: var(--radius);
-  background: var(--color-background);
-  border: 1px solid var(--color-border-light);
-}
+
 .repro-opcion-num {
   font-size: 11px;
   font-weight: 700;
@@ -1229,11 +1270,6 @@ Fin:
     min-width: 0;
   }
 
-  .repro-opcion {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 4px;
-  }
 }
 
 .confirm-text { font-size: 13px; color: var(--color-text-secondary); margin: 0; line-height: 1.6; }
