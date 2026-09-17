@@ -227,25 +227,13 @@ await updateDoc(
   usuario_id: destinatario,
   titulo: esAprobada ? 'Solicitud aprobada' : 'Solicitud rechazada',
 
-  mensaje: esAprobada
-    ? `Tu solicitud de ${tipoSolicitud.toLowerCase()} para la materia ${solicitudAccion.value.materia} fue aprobada por la Dirección del Programa.
-
-Las fechas de reprogramación seleccionadas son:
-${
- opcionReprogramacionSeleccionada.value
- ? `
-Inicio: ${formatFechaHoraSolicitud(opcionReprogramacionSeleccionada.value.inicio)}
-Fin: ${formatFechaHoraSolicitud(opcionReprogramacionSeleccionada.value.fin)}
-`
- : 'Sin fecha seleccionada'
-}
-
-Mensaje adicional:
-
-${mensajeDirector.value || '—'}`
-    : `Tu solicitud de ${tipoSolicitud.toLowerCase()} para la materia ${solicitudAccion.value.materia} fue rechazada.
-
-Motivo: ${motivoRechazo.value}`,
+mensaje: esAprobada
+? `Solicitud aprobada. Nueva fecha: ${
+    opcionReprogramacionSeleccionada.value
+      ? formatFechaHoraSolicitud(opcionReprogramacionSeleccionada.value.inicio)
+      : 'Sin reprogramación'
+  }. ${mensajeDirector.value || ''}`
+: `Tu solicitud de ${tipoSolicitud.toLowerCase()} fue rechazada. Motivo: ${motivoRechazo.value}`,
 
   tipo: esAprobada ? 'success' : 'error',
 
@@ -259,7 +247,7 @@ Motivo: ${motivoRechazo.value}`,
       }
     }
 
-        // 4. Notificar estudiantes inscritos cuando se aprueba una inasistencia docente
+// 4. Notificar estudiantes inscritos cuando se aprueba una inasistencia docente
 if (
   accionPendiente.value === 'aprobar' &&
   (
@@ -322,6 +310,7 @@ const cancelarAccion = () => {
   solicitudAccion.value = null
   accionPendiente.value = null
   motivoRechazo.value = ''
+  mensajeDirector.value = ''
   errorMotivoRechazo.value = false
 }
 
