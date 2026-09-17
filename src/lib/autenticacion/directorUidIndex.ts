@@ -9,7 +9,8 @@ export async function sincronizarIndiceDirectorUid(
   cedula: string,
 ): Promise<void> {
   if (!authUid?.trim() || !esRolDirector(rol)) return
-  await setDoc(doc(db, 'indices/director_uids', authUid.trim()), {
+
+  await setDoc(doc(db, 'director_uids', authUid.trim()), {
     cedula: cedula.trim(),
     rol,
   })
@@ -17,5 +18,8 @@ export async function sincronizarIndiceDirectorUid(
 
 export async function quitarIndiceDirectorUid(authUid: string): Promise<void> {
   if (!authUid?.trim()) return
-  await deleteDoc(doc(db, 'indices/director_uids', authUid.trim())).catch(() => {})
+
+  await deleteDoc(
+    doc(db, 'director_uids', authUid.trim())
+  ).catch(() => {})
 }

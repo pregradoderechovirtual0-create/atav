@@ -51,6 +51,7 @@ const solicitudAccion = ref<any>(null)
 const motivoRechazo = ref('')
 const errorMotivoRechazo = ref(false)
 const confirmandoAccion = ref(false)
+const opcionReprogramacionSeleccionada = ref<any>(null)
 
 // Toast
 const toastVisible = ref(false)
@@ -125,9 +126,10 @@ const pendientesCount = computed(() =>
   solicitudes.value.filter(s => s.estado === 'Pendiente').length
 )
 
-const verSolicitud = (sol: any) => {
-  solicitudSeleccionada.value = sol
-  modalVerVisible.value = true
+const verSolicitud = (sol:any)=>{
+ solicitudSeleccionada.value = sol
+ opcionReprogramacionSeleccionada.value = null
+ modalVerVisible.value = true
 }
 
 const pedirConfirmacion = (sol: any, accion: 'aprobar' | 'rechazar') => {
@@ -172,10 +174,24 @@ const estadoGuardar = nuevoEstado.toLowerCase()
         ...(accionPendiente.value === 'rechazar' ? { motivo: motivoRechazo.value.trim() } : {}),
       }),
     }
-    if (accionPendiente.value === 'rechazar') {
-      payload.motivo_rechazo = motivoRechazo.value.trim()
-    }
-    await updateDoc(doc(db, coleccion, solicitudAccion.value.id), payload)
+  
+if (accionPendiente.value === 'rechazar') {
+
+  payload.motivo_rechazo = motivoRechazo.value.trim()
+
+}
+
+if (opcionReprogramacionSeleccionada.value) {
+
+  payload.fecha_reprogramacion_aprobada =
+    opcionReprogramacionSeleccionada.value
+
+}
+
+await updateDoc(
+  doc(db, coleccion, solicitudAccion.value.id),
+  payload
+)
  
     // 2. Actualizar estado en el array local
     const idx = solicitudes.value.findIndex(s => s.id === solicitudAccion.value.id)
@@ -209,10 +225,17 @@ const estadoGuardar = nuevoEstado.toLowerCase()
     ? `Tu solicitud de ${tipoSolicitud.toLowerCase()} para la materia ${solicitudAccion.value.materia} fue aprobada por la Dirección del Programa.
 
 Las fechas de reprogramación seleccionadas son:
-${(solicitudAccion.value.fechas_reprogramacion || []).join('; ')}
+${
+ opcionReprogramacionSeleccionada.value
+ ? `
+Inicio: ${formatFechaHoraSolicitud(opcionReprogramacionSeleccionada.value.inicio)}
+Fin: ${formatFechaHoraSolicitud(opcionReprogramacionSeleccionada.value.fin)}
+`
+ : 'Sin fecha seleccionada'
+}
 
 Mensaje adicional:
-${solicitudAccion.value.mensaje_adicional || '—'}`
+${solicitudAccion.value.descripcion || '—'}`
     : `Tu solicitud de ${tipoSolicitud.toLowerCase()} para la materia ${solicitudAccion.value.materia} fue rechazada.
 
 Motivo: ${motivoRechazo.value}`,
@@ -274,14 +297,18 @@ await notificarEstudiantesSuscritos(
     mostrarToast(`Solicitud ${nuevoEstado.toLowerCase()} correctamente`)
   } catch (e) {
     console.error(e)
-  } finally {
-    confirmandoAccion.value = false
-    modalConfirmVisible.value = false
-    solicitudAccion.value = null
-    accionPendiente.value = null
-    motivoRechazo.value = ''
-  }
+  } 
+
+finally {
+  confirmandoAccion.value = false
+  modalConfirmVisible.value = false
+  solicitudAccion.value = null
+  accionPendiente.value = null
+  motivoRechazo.value = ''
+  opcionReprogramacionSeleccionada.value = null
 }
+
+} 
 
 const cancelarAccion = () => {
   modalConfirmVisible.value = false
@@ -338,11 +365,20 @@ const formatFecha = (ts: any) => {
 
 const inicialesNombre = (nombre: string) => {
   if (!nombre) return '?'
-  return nombre.split(' ').slice(0, 2).map((n: string) => n[0]).join('').toUpperCase()
+
+  return nombre
+    .split(' ')
+    .slice(0, 2)
+    .map((n: string) => n[0])
+    .join('')
+    .toUpperCase()
 }
 
 const fechasReprogramacionLista = (sol: SolicitudDirector) =>
-  (sol.fechas_reprogramacion || []).filter(Boolean)
+  (sol.fechas_reprogramacion || []).filter(
+    (fecha:any) => fecha?.inicio
+  )
+
 </script>
 
 <template>
@@ -615,13 +651,22 @@ const fechasReprogramacionLista = (sol: SolicitudDirector) =>
                   </div>
                 </div>
                 <div v-if="fechasReprogramacionLista(solicitudSeleccionada).length" class="repro-opciones">
-                  <div
-                    v-for="(fecha, idx) in fechasReprogramacionLista(solicitudSeleccionada)"
-                    :key="idx"
-                    class="repro-opcion"
-                  >
+<div
+ v-for="(fecha, idx) in fechasReprogramacionLista(solicitudSeleccionada)"
+ :key="idx"
+ class="repro-opcion"
+ @click="opcionReprogramacionSeleccionada = fecha"
+>
                     <span class="repro-opcion-num">Opción {{ idx + 1 }}</span>
-                    <span class="repro-opcion-fecha">{{ formatFechaHoraSolicitud(fecha) }}</span>
+                    <span class="repro-opcion-fecha">
+Inicio:
+{{ formatFechaHoraSolicitud(fecha.inicio) }}
+
+<br>
+
+Fin:
+{{ formatFechaHoraSolicitud(fecha.fin) }}
+</span>
                   </div>
                 </div>
                 <p v-else class="detail-text detail-text--muted">Sin fechas propuestas</p>
