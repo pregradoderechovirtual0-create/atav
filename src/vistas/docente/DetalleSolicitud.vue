@@ -1,7 +1,13 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { auth } from '@/lib/firebase'
+import { auth, db } from '@/lib/firebase'
+import {
+  collection,
+  query,
+  where,
+  getDocs
+} from 'firebase/firestore'
 import { onAuthStateChanged } from 'firebase/auth'
 import { fetchSolicitudDocente, type SolicitudDocente } from '@/lib/solicitudes/docenteSolicitudes'
 
@@ -9,6 +15,7 @@ const route = useRoute()
 const router = useRouter()
 const solicitud = ref<SolicitudDocente | null>(null)
 const cargando = ref(true)
+const mensajeNotificacion = ref('')
 
 const formatFecha = (iso: string) => {
   if (!iso) return '—'
@@ -16,13 +23,78 @@ const formatFecha = (iso: string) => {
   return `${d}/${m}/${y}`
 }
 
-const formatFechaHora = (valor: string) => {
+const formatFechaHora = (valor: any) => {
+
   if (!valor) return '—'
-  if (valor.includes('T')) {
-    const [fecha, hora] = valor.split('T')
-    return `${formatFecha(fecha)} ${hora.slice(0, 5)}`
+
+
+  // Si viene como Timestamp de Firebase
+  if (valor?.toDate) {
+
+    const fecha = valor.toDate()
+
+    return fecha.toLocaleString('es-CO', {
+      dateStyle: 'short',
+      timeStyle: 'short'
+    })
+
   }
-  return formatFecha(valor)
+
+
+  // Si viene como texto
+  if (typeof valor === 'string') {
+
+    if (valor.includes('T')) {
+
+      const [fecha, hora] = valor.split('T')
+
+      return `${formatFecha(fecha)} ${hora.slice(0,5)}`
+
+    }
+
+    return formatFecha(valor)
+
+  }
+
+
+  return '—'
+}
+
+const cargarMensajeNotificacion = async (
+  uid:string,
+  solicitudId:string
+)=>{
+
+  try {
+
+    const q = query(
+      collection(db,'notificaciones'),
+      where('usuario_id','==',uid),
+      where('solicitud_id','==',solicitudId)
+    )
+
+
+    const resultado = await getDocs(q)
+
+
+    if(!resultado.empty){
+
+      const data = resultado.docs[0].data()
+
+      mensajeNotificacion.value = data.mensaje || ''
+
+    }
+
+
+  } catch(error){
+
+    console.error(
+      "Error buscando notificación:",
+      error
+    )
+
+  }
+
 }
 
 const opcionesReprogramacion = computed(() =>
@@ -32,17 +104,45 @@ const opcionesReprogramacion = computed(() =>
 )
 
 const cargar = async (uid: string) => {
+
   const id = route.params.id as string
+
+  console.log("ID recibido:", id)
+  console.log("Usuario actual:", uid)
+
   cargando.value = true
+
   try {
+
     const data = await fetchSolicitudDocente(id, uid)
+
+    console.log("Resultado Firebase:", data)
+
     if (!data) {
-      router.replace('/docente/mis-solicitudes')
+
+      console.warn("No llegó información de solicitud")
+
       return
     }
+
     solicitud.value = data
+
+    await cargarMensajeNotificacion(
+      uid,
+      id
+    )
+
+  } catch(error){
+
+    console.error(
+      "ERROR cargando detalle:",
+      error
+    )
+
   } finally {
+
     cargando.value = false
+
   }
 }
 
@@ -104,45 +204,25 @@ onMounted(() => {
         </div>
       </section>
 
-      <section class="detalle-card">
-        <h2 class="section-title">Reprogramación propuesta</h2>
-        <div class="info-grid">
-          <div class="info-item full">
-            <span class="info-label">Tipo</span>
-            <span class="info-value">{{ solicitud.tipoReprogramacionLabel || '—' }}</span>
-          </div>
-        </div>
-        <div v-if="opcionesReprogramacion.length" class="opciones-list">
-          <div v-for="op in opcionesReprogramacion" :key="op.index" class="opcion-item">
-            <span class="opcion-num">Opción {{ op.index }}</span>
-            <span class="opcion-fecha">{{ formatFechaHora(op.fecha) }}</span>
-          </div>
-        </div>
-        <p v-else class="empty-inline">Sin fechas de reprogramación registradas.</p>
-      </section>
-
       <section v-if="solicitud.motivo_rechazo && solicitud.estadoLabel === 'Rechazada'" class="detalle-rechazo">
         <h2 class="section-title">Motivo de rechazo</h2>
         <p class="rechazo-text">{{ solicitud.motivo_rechazo }}</p>
       </section>
 
-      <section class="detalle-card">
-        <h2 class="section-title">Documentación de soporte</h2>
-        <a
-          v-if="solicitud.pdf_url"
-          :href="solicitud.pdf_url"
-          target="_blank"
-          rel="noopener noreferrer"
-          class="pdf-link"
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-            <polyline points="14 2 14 8 20 8"/>
-          </svg>
-          Ver documento PDF adjunto
-        </a>
-        <p v-else class="empty-inline">No se adjuntó documento en esta solicitud.</p>
-      </section>
+<section 
+v-if="mensajeNotificacion"
+class="detalle-card">
+
+<h2 class="section-title">
+Mensaje adicional
+</h2>
+
+<p class="info-text">
+{{ mensajeNotificacion }}
+</p>
+
+</section>
+
     </template>
   </div>
 </template>

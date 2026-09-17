@@ -36,6 +36,7 @@ export interface CrearNotificacionInput {
   tipo?: TipoNotificacion;
   ruta?: string;
   materia_codigo?: string;
+  solicitud_id?: string;
 }
 
 export const formatFechaRelativa = (ts: unknown): string => {
@@ -103,44 +104,65 @@ export const cargarNotificacionesUsuario = async (
     .sort((a, b) => b.fechaSort - a.fechaSort);
 };
 
-export const crearNotificacion = async (input: CrearNotificacionInput) => {
-  await addDoc(collection(db, "notificaciones"), {
-    usuario_id: input.usuario_id,
-    titulo: input.titulo,
-    mensaje: input.mensaje,
-    tipo: input.tipo || "info",
-    leida: false,
-    ruta: input.ruta ?? "/docente/notificaciones",
-    ...(input.materia_codigo
-      ? { materia_codigo: input.materia_codigo }
-      : {}),
-    fecha_creacion: serverTimestamp(),
-  });
-};
-
 export const notificarEstudiantesSuscritos = async (
   materiaCodigo: string,
   mensaje: string,
+  solicitudId: string,
 ) => {
+
   const snap = await getDocs(
     query(
       collection(db, "suscripciones_materias"),
       where("materia_codigo", "==", materiaCodigo),
     ),
   );
+
   await Promise.all(
     snap.docs.map((suscripcion) => {
+
       const estudianteId = suscripcion.data().estudiante_id as string;
+
       return crearNotificacion({
+
         usuario_id: estudianteId,
         titulo: `Novedad en ${materiaCodigo}`,
         mensaje,
         tipo: "info",
         ruta: "/estudiante/ausentismos-docentes",
         materia_codigo: materiaCodigo,
+        solicitud_id: solicitudId,
+
       });
+
     }),
   );
+};
+
+export const crearNotificacion = async (
+  input: CrearNotificacionInput
+) => {
+
+  await addDoc(collection(db, "notificaciones"), {
+
+    usuario_id: input.usuario_id,
+    titulo: input.titulo,
+    mensaje: input.mensaje,
+    tipo: input.tipo || "info",
+    leida: false,
+    ruta: input.ruta ?? "/docente/notificaciones",
+
+    ...(input.materia_codigo
+      ? { materia_codigo: input.materia_codigo }
+      : {}),
+
+    ...(input.solicitud_id
+      ? { solicitud_id: input.solicitud_id }
+      : {}),
+
+    fecha_creacion: serverTimestamp(),
+
+  });
+
 };
 
 const ROLES_DIRECTOR = ["Director", "Jefa Suprema"] as const;
@@ -153,36 +175,48 @@ const obtenerUidsDirectores = async (): Promise<string[]> => {
         where("rol", "in", [...ROLES_DIRECTOR]),
       ),
     );
+
     return snap.docs
       .map((d) => d.data().auth_uid as string | undefined)
       .filter((uid): uid is string => Boolean(uid));
+
   } catch (error) {
-    console.warn("No se pudieron obtener UIDs de directores:", error);
+    console.warn("Error obteniendo directores:", error);
     return [];
   }
 };
 
 export const notificarDirectores = async (
-  input: Omit<CrearNotificacionInput, "usuario_id">,
+  input: Omit<CrearNotificacionInput, "usuario_id">
 ) => {
-  const uids = await obtenerUidsDirectores();
-  if (!uids.length) {
-    console.warn("No hay directores con UID vinculado para notificar.");
-    return;
-  }
+
+  const directores = await obtenerUidsDirectores();
 
   await Promise.all(
-    uids.map((uid) => crearNotificacion({ ...input, usuario_id: uid })),
+    directores.map((uid) =>
+      crearNotificacion({
+        ...input,
+        usuario_id: uid,
+      })
+    )
   );
+
 };
 
-export const rutaNotificacionEstudiante = (tipo: string): string => {
-  const rutas: Record<string, string> = {
+export const rutaNotificacionEstudiante = (
+  tipo: string
+): string => {
+
+  const rutas: Record<string,string> = {
+
     flexibilizacion: "/estudiante/flexibilidad",
     habilitacion: "/estudiante/habilitaciones",
     supletorio: "/estudiante/supletorios",
+
   };
+
   return rutas[tipo] || "/estudiante";
+
 };
 
 export const rutaNotificacionesPorRol = (): string => {

@@ -330,25 +330,41 @@ export async function fetchSolicitudesDocente(
 
 
 export async function fetchSolicitudDocente(
-  id:string,
-  uid:string
-): Promise<SolicitudDocente|null>{
+  id: string,
+  uid: string
+): Promise<SolicitudDocente | null> {
 
-  const snap =
-    await getDoc(
-      doc(db,'solicitudes',id)
+  const snap = await getDoc(
+    doc(db, "solicitudes", id)
+  )
+
+
+  if (!snap.exists()) {
+    console.warn("Solicitud no existe:", id)
+    return null
+  }
+
+
+  const data = snap.data()
+
+
+  console.log("Solicitud encontrada:", data)
+  console.log("Usuario sesión:", uid)
+
+
+  // Validación del propietario
+  if (data.usuario_id && data.usuario_id !== uid) {
+
+    console.warn(
+      "La solicitud no pertenece al usuario actual",
+      {
+        guardado: data.usuario_id,
+        actual: uid
+      }
     )
 
-
-  if(!snap.exists())
     return null
-
-
-  const data=snap.data()
-
-
-  if(data.usuario_id!==uid)
-    return null
+  }
 
 
   return mapDocSolicitud(
@@ -356,7 +372,6 @@ export async function fetchSolicitudDocente(
     data
   )
 }
-
 export type FechaReprogramacion = string;
 
 export interface CrearSolicitudDocenteInput {
