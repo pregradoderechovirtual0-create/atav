@@ -16,9 +16,35 @@ const formData = ref({
 })
 
 const roles = [
-  { id: 'Docente', label: 'Docente', description: 'Acceso a solicitudes y gestion academica' },
-  { id: 'Estudiante', label: 'Estudiante', description: 'Crear y consultar solicitudes' },
-  { id: 'Director', label: 'Practicante', description: 'Gestion y aprobacion de solicitudes' },
+  { 
+    id: 'Docente',
+    label: 'Docente',
+    description: 'Acceso a solicitudes y gestión académica'
+  },
+
+  { 
+    id: 'Estudiante',
+    label: 'Estudiante',
+    description: 'Crear y consultar solicitudes'
+  },
+
+  { 
+    id: 'Director',
+    label: 'Director',
+    description: 'Gestión administrativa y aprobación'
+  },
+
+  { 
+    id: 'Representante',
+    label: 'Representante',
+    description: 'Consulta de usuarios, materias y solicitudes'
+  },
+
+  { 
+    id: 'Secretaria',
+    label: 'Secretaria',
+    description: 'Gestión académica y administrativa'
+  }
 ]
 
 // ── Toast ─────────────────────────────────────────────────────────

@@ -13,21 +13,27 @@ const { isMobile, mobileOpen, isOpen, toggleSidebar, closeMobileMenu } =
 
 const inferRoleFromPath = (
   path: string,
-): "docente" | "director" | "estudiante" => {
+): "docente" | "director" | "estudiante" | "representante" | "secretaria" => { 
+
   if (path.startsWith("/docente")) return "docente";
   if (path.startsWith("/director")) return "director";
   if (path.startsWith("/estudiante")) return "estudiante";
+  if (path.startsWith("/representante")) return "representante";
+  if (path.startsWith("/secretaria")) return "secretaria";
+
   return "estudiante";
 };
 
-const roleFromStorage = (): "docente" | "director" | "estudiante" => {
+const roleFromStorage = (): "docente" | "director" | "estudiante" | "representante" | "secretaria" => {
   const rol = localStorage.getItem("rol");
   if (rol) return mapRolMenu(rol);
   return inferRoleFromPath(route.path);
 };
 
 // ── Estado del menú ──────────────────────────────────────────────
-const role = ref<"docente" | "director" | "estudiante">(roleFromStorage());
+const role = ref<
+  "docente" | "director" | "estudiante" | "representante" | "secretaria"
+>(roleFromStorage());
 
 // ── Cargar rol del usuario ───────────────────────────────────────
 onMounted(async () => {
@@ -88,6 +94,78 @@ const menuItems = computed(() => {
     ];
   }
 
+if (role.value === "secretaria") {
+
+  return [
+    {
+      name:"Inicio",
+      path:"/secretaria",
+      icon:"home",
+    },
+
+    {
+      name:"Solicitudes",
+      path:"/secretaria/solicitudes",
+      icon:"inbox",
+    },
+
+    {
+      name:"Usuarios",
+      path:"/secretaria/usuarios",
+      icon:"users",
+    },
+
+    {
+      name:"Materias",
+      path:"/secretaria/materias",
+      icon:"book",
+    },
+
+    {
+      name:"Calendario",
+      path:"/secretaria/calendario",
+      icon:"calendar",
+    },
+
+    {
+      name:"Recursos",
+      path:"/secretaria/recursos",
+      icon:"folder",
+    },
+  ];
+
+}
+
+if (role.value === "representante") {
+  return [
+    {
+      name: "Inicio",
+      path: "/representante",
+      icon: "home",
+    },
+    {
+      name: "Usuarios",
+      path: "/representante/usuarios",
+      icon: "users",
+    },
+    {
+      name: "Materias",
+      path: "/representante/materias",
+      icon: "book",
+    },
+    {
+      name: "Calendario",
+      path: "/representante/calendario",
+      icon: "calendar",
+    },
+    {
+      name: "Recursos",
+      path: "/representante/recursos",
+      icon: "folder",
+    },
+  ];
+}
+
   return [
     { name: "Inicio", path: "/estudiante", icon: "home" },
     { name: "Mis materias", path: "/estudiante/materias", icon: "book" },
@@ -125,11 +203,13 @@ const menuItems = computed(() => {
 const isActive = (path: string) => {
   const current = route.path;
   if (current === path) return true;
-  if (
-    path === "/director" ||
-    path === "/estudiante" ||
-    path === "/docente/dashboard"
-  ) {
+if (
+ path === "/director" ||
+ path === "/estudiante" ||
+ path === "/docente/dashboard" ||
+ path === "/representante" ||
+ path === "/secretaria"
+) {
     return false;
   }
   return current.startsWith(`${path}/`);

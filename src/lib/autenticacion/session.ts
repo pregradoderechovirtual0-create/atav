@@ -184,8 +184,22 @@ export async function cerrarSesion() {
 
 export function puedeAccederRuta(rol: string, path: string): boolean {
   if (path.startsWith('/perfil')) return true
-  if (path.startsWith('/director')) return esRolDirector(rol)
-  if (path.startsWith('/docente')) return rol === 'Docente'
-  if (path.startsWith('/estudiante')) return rol === 'Estudiante'
+
+  if (path.startsWith('/director')) 
+    return esRolDirector(rol)
+
+  if (path.startsWith('/docente')) 
+    return rol === 'Docente'
+
+  if (path.startsWith('/estudiante')) 
+    return rol === 'Estudiante'
+
+if (path.startsWith('/representante')) {
+  return rol?.trim().toLowerCase() === 'representante'
+}
+if (path.startsWith('/secretaria')) {
+  return rol?.trim().toLowerCase() === 'secretaria'
+}
+
   return false
 }

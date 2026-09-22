@@ -18,8 +18,14 @@ export function esRolDirector(rol: string | null | undefined): boolean {
   return rol === ROL_DIRECTOR || rol === ROL_JEFA_SUPREMA
 }
 
-export function mapRolMenu(rol: string): 'docente' | 'director' | 'estudiante' {
+export function mapRolMenu(
+ rol:string
+): 'docente'|'director'|'estudiante'|'representante'|'secretaria' {
   if (rol === 'Docente') return 'docente'
   if (esRolDirector(rol)) return 'director'
+  if (rol?.trim().toLowerCase() === 'representante') {
+  return 'representante'
+}
+  if (rol === 'Secretaria') return 'secretaria'
   return 'estudiante'
 }

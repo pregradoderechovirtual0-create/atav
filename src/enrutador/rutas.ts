@@ -112,6 +112,96 @@ export const routes: RouteRecordRaw[] = [
     component: lazy(() => import("@/vistas/compartido/Recursos.vue")),
   },
 
+// SECRETARIA
+
+{
+ path:"/secretaria",
+ component: lazy(
+   () => import("@/vistas/Secretaria/SecretariaDashboard.vue")
+ )
+},
+
+{
+ path:"/secretaria/usuarios",
+ component: lazy(
+   () => import("@/vistas/Secretaria/SecretariaUsuarios.vue")
+ )
+},
+
+{
+ path:"/secretaria/materias",
+ component: lazy(
+   () => import("@/vistas/Secretaria/SecretariaMaterias.vue")
+ )
+},
+
+{
+ path:"/secretaria/solicitudes",
+ component: lazy(
+   () => import("@/vistas/Secretaria/SecretariaSolicitudes.vue")
+ )
+},
+
+{
+ path:"/secretaria/calendario",
+ component: lazy(
+   () => import("@/vistas/compartido/Calendario.vue")
+ )
+},
+
+{
+ path:"/secretaria/recursos",
+ component: lazy(
+   () => import("@/vistas/compartido/Recursos.vue")
+ )
+},
+
+// REPRESENTANTE
+
+{
+  path: "/representante",
+  component: lazy(
+    () => import("@/vistas/Representante/RepresentanteDashboard.vue")
+  ),
+},
+
+{
+  path: "/representante/solicitudes",
+  component: lazy(
+    () => import("@/vistas/Representante/RepresentanteSolicitudes.vue")
+  ),
+},
+
+{
+  path: "/representante/usuarios",
+  component: lazy(
+    () => import("@/vistas/Representante/RepresentanteUsuarios.vue")
+  ),
+},
+
+{
+  path: "/representante/materias",
+  component: lazy(
+    () => import("@/vistas/Representante/RepresentanteMaterias.vue")
+  ),
+},
+
+{
+  path: "/representante/calendario",
+  component: lazy(
+    () => import("@/vistas/compartido/Calendario.vue")
+  ),
+},
+
+{
+  path: "/representante/recursos",
+  component: lazy(
+    () => import("@/vistas/compartido/Recursos.vue")
+  ),
+},
+
+// ESTUDIANTES
+
   {
     path: "/estudiante",
     component: lazy(
