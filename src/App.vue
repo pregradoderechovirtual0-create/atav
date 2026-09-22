@@ -276,11 +276,10 @@ const mobileBarTitle = computed(() =>
 }
 
 .view-header--actions-only {
-  position: absolute;
-  top: 24px;
-  right: 24px;
-  margin-bottom: 0;
-  z-index: 20;
+  position: relative;
+  margin-bottom: 24px;
+  justify-content: flex-end;
+  width: 100%;
 }
 
 .page-heading {

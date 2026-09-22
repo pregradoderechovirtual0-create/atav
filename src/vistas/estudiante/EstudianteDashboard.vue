@@ -47,14 +47,14 @@ const accionesRapidas = [
     bg: "#f0fdfa",
   },
 
-{
-  title: "Mis materias suscritas",
-  desc: "Accede a tus encuentros virtuales",
-  path: "/estudiante/mis-materias",
-  icon: "video",
-  color: "#0f766e",
-  bg: "#f0fdfa",
-},
+  {
+    title: "Mis materias suscritas",
+    desc: "Accede a tus encuentros virtuales",
+    path: "/estudiante/mis-materias",
+    icon: "video",
+    color: "#0f766e",
+    bg: "#f0fdfa",
+  },
 
   {
     title: "Ausentismos docentes",
@@ -93,22 +93,15 @@ const accionesRapidas = [
 
 const abrirReunion = (materia: SuscripcionMateria) => {
   if (materia.enlace_reunion) {
-    window.open(
-      materia.enlace_reunion,
-      "_blank"
-    );
+    window.open(materia.enlace_reunion, "_blank");
   }
 };
 
-const cargarMateriasSuscritas = async (uid:string) => {
+const cargarMateriasSuscritas = async (uid: string) => {
   try {
-    materiasSuscritas.value =
-      await cargarSuscripcionesMateria(uid);
-  } catch(error){
-    console.error(
-      "Error cargando materias suscritas:",
-      error
-    );
+    materiasSuscritas.value = await cargarSuscripcionesMateria(uid);
+  } catch (error) {
+    console.error("Error cargando materias suscritas:", error);
     materiasSuscritas.value = [];
   } finally {
     cargandoSuscritas.value = false;
@@ -241,7 +234,6 @@ onMounted(async () => {
       precargarCachesSolicitudesEstudiante(user.uid);
       cargarSolicitudes(user.uid);
       cargarMateriasSuscritas(user.uid);
-
     } else cargando.value = false;
   });
 });
@@ -486,74 +478,67 @@ const tipoColorParcial: Record<string, string> = {
     </section>
 
     <section class="card materias-suscritas">
-
-<div class="materia-icon">
-  <svg
-    width="22"
-    height="22"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    stroke-width="2"
-  >
-    <path d="M23 7l-7 5 7 5V7z"/>
-    <rect x="1" y="5" width="15" height="14" rx="2"/>
-  </svg>
-</div>
-
-<div class="card-header">
-  <div>
-    <h2>Mis materias suscritas</h2>
-    <p class="materias-subtitle">
-      Accede a tus encuentros virtuales del semestre
-    </p>
-  </div>
-</div>
-
-    <div
-      v-for="materia in materiasSuscritas"
-      :key="materia.materia_codigo"
-      class="materia-suscrita-row"
-    >
-
-      <div class="materia-suscrita-info">
-
-        <span class="materia-codigo">
-{{ materia.materia_codigo }}
-</span>
-
-<strong>
-{{ materia.materia_label }}
-</strong>
-
-        <span>
-          Profesor:
-          {{ materia.profesor || 'Sin asignar' }}
-          ·
-          {{ materia.semestre || 'Semestre no indicado' }}
-        </span>
-
+      <div class="materia-icon">
+        <svg
+          width="22"
+          height="22"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <path d="M23 7l-7 5 7 5V7z" />
+          <rect x="1" y="5" width="15" height="14" rx="2" />
+        </svg>
       </div>
 
-<button
-  type="button"
-  :class="[
-    'materia-btn',
-    materia.enlace_reunion ? 'activo' : 'disabled'
-  ]"
-  @click="abrirReunion(materia)"
->
-  {{
-    materia.enlace_reunion
-      ? 'Ingresar reunión'
-      : 'Sin enlace disponible'
-  }}
-</button>
+      <div class="card-header">
+        <div>
+          <h2>Mis materias suscritas</h2>
+          <p class="materias-subtitle">
+            Accede a tus encuentros virtuales del semestre
+          </p>
+        </div>
+      </div>
 
+      <div
+        v-for="materia in materiasSuscritas"
+        :key="materia.materia_codigo"
+        class="materia-suscrita-row"
+      >
+        <div class="materia-suscrita-info">
+          <span class="materia-codigo">
+            {{ materia.materia_codigo }}
+          </span>
 
-    </div>
+          <strong>
+            {{ materia.materia_label }}
+          </strong>
 
-</section>
+          <span>
+            Profesor:
+            {{ materia.profesor || "Sin asignar" }}
+            ·
+            {{ materia.semestre || "Semestre no indicado" }}
+          </span>
+        </div>
+
+        <button
+          type="button"
+          :class="[
+            'materia-btn',
+            materia.enlace_reunion ? 'activo' : 'disabled',
+          ]"
+          @click="abrirReunion(materia)"
+        >
+          {{
+            materia.enlace_reunion
+              ? "Ingresar reunión"
+              : "Sin enlace disponible"
+          }}
+        </button>
+      </div>
+    </section>
 
     <div class="info-bar">
       <div class="info-icon">
@@ -841,107 +826,106 @@ const tipoColorParcial: Record<string, string> = {
 </template>
 
 <style scoped>
-
 .materia-btn {
-  border:none;
-  padding:12px 22px;
-  border-radius:12px;
-  font-weight:700;
-  cursor:pointer;
-  transition:.2s;
+  border: none;
+  padding: 12px 22px;
+  border-radius: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: 0.2s;
 }
 
 .materia-btn.activo {
-  background:#087f6e;
-  color:white;
-  box-shadow:0 8px 18px rgba(8,127,110,.25);
+  background: #087f6e;
+  color: white;
+  box-shadow: 0 8px 18px rgba(8, 127, 110, 0.25);
 }
 
 .materia-btn.activo:hover {
-  background:#115e59;
-  transform:translateY(-2px);
+  background: #115e59;
+  transform: translateY(-2px);
 }
 
 .materia-btn.disabled {
-  background:#e2e8f0;
-  color:#64748b;
-  cursor:not-allowed;
+  background: #e2e8f0;
+  color: #64748b;
+  cursor: not-allowed;
 }
 
 .reunion-btn {
-  border:none;
-  border-radius:14px;
-  padding:14px 26px;
-  background:#087f6e;
-  color:white;
-  font-weight:700;
-  font-size:14px;
-  box-shadow:0 8px 18px rgba(8,127,110,.25);
+  border: none;
+  border-radius: 14px;
+  padding: 14px 26px;
+  background: #087f6e;
+  color: white;
+  font-weight: 700;
+  font-size: 14px;
+  box-shadow: 0 8px 18px rgba(8, 127, 110, 0.25);
 }
 
 .reunion-btn.disabled {
-  background:#e2e8f0;
-  color:#64748b;
-  box-shadow:none;
+  background: #e2e8f0;
+  color: #64748b;
+  box-shadow: none;
 }
 
 .materias-suscritas {
- padding-bottom:20px;
+  padding-bottom: 20px;
 }
 
 .materia-suscrita-row {
- display:flex;
- align-items:center;
- gap:16px;
- padding:18px 20px;
- border-bottom:1px solid var(--color-border-light);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--color-border-light);
 }
 
 .materia-icon {
- width:44px;
- height:44px;
- border-radius:12px;
- background:#ecfdf5;
- color:#10b981;
- display:flex;
- align-items:center;
- justify-content:center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: #ecfdf5;
+  color: #10b981;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .materia-suscrita-info {
- flex:1;
- display:flex;
- flex-direction:column;
- gap:5px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
 }
 
 .materia-codigo {
- font-size:11px;
- color:#2563eb;
- font-weight:600;
+  font-size: 11px;
+  color: #2563eb;
+  font-weight: 600;
 }
 
 .materia-suscrita-info strong {
- font-size:15px;
+  font-size: 15px;
 }
 
 .materia-suscrita-info span:last-child {
- font-size:13px;
- color:var(--color-text-muted);
+  font-size: 13px;
+  color: var(--color-text-muted);
 }
 
 .materia-suscrita-action {
- border:none;
- padding:10px 18px;
- border-radius:10px;
- background:#0f766e;
- color:white;
- font-weight:600;
- cursor:pointer;
+  border: none;
+  padding: 10px 18px;
+  border-radius: 10px;
+  background: #0f766e;
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
 }
 
 .materia-suscrita-action:hover {
- background:#115e59;
+  background: #115e59;
 }
 
 .estudiante-dashboard {

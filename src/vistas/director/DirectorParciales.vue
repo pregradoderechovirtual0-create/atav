@@ -1,62 +1,66 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted } from "vue";
 import {
   cargarConfigParciales,
   guardarConfigParciales,
   formatRango,
   type ConfigParciales,
   type ParcialRango,
-} from '@/lib/dominio/parciales'
+} from "@/lib/dominio/parciales";
 
-const loading = ref(true)
-const guardando = ref(false)
-const toast = ref('')
+const loading = ref(true);
+const guardando = ref(false);
+const toast = ref("");
 
 const form = ref({
-  periodo: '',
-  notas: '',
-  parcial_1: { inicio: '', fin: '' },
-  parcial_2: { inicio: '', fin: '' },
-  parcial_3: { inicio: '', fin: '' },
-})
+  periodo: "",
+  notas: "",
+  parcial_1: { inicio: "", fin: "" },
+  parcial_2: { inicio: "", fin: "" },
+  parcial_3: { inicio: "", fin: "" },
+});
 
 const parcialesMeta = [
-  { id: '1', key: 'parcial_1' as const, label: 'Parcial 1' },
-  { id: '2', key: 'parcial_2' as const, label: 'Parcial 2' },
-  { id: '3', key: 'parcial_3' as const, label: 'Parcial 3' },
-]
+  { id: "1", key: "parcial_1" as const, label: "Parcial 1" },
+  { id: "2", key: "parcial_2" as const, label: "Parcial 2" },
+  { id: "3", key: "parcial_3" as const, label: "Parcial 3" },
+];
 
 onMounted(async () => {
-  const config = await cargarConfigParciales()
+  const config = await cargarConfigParciales();
   form.value = {
     periodo: config.periodo,
     notas: config.notas,
-    parcial_1: config.parcial_1 ?? { inicio: '', fin: '' },
-    parcial_2: config.parcial_2 ?? { inicio: '', fin: '' },
-    parcial_3: config.parcial_3 ?? { inicio: '', fin: '' },
-  }
-  loading.value = false
-})
+    parcial_1: config.parcial_1 ?? { inicio: "", fin: "" },
+    parcial_2: config.parcial_2 ?? { inicio: "", fin: "" },
+    parcial_3: config.parcial_3 ?? { inicio: "", fin: "" },
+  };
+  loading.value = false;
+});
 
 const validar = (): string | null => {
-  if (!form.value.periodo.trim()) return 'Indica el periodo académico (ej. 2028A, 2027B)'
+  if (!form.value.periodo.trim())
+    return "Indica el periodo académico (ej. 2028A, 2027B)";
   for (const p of parcialesMeta) {
-    const r = form.value[p.key]
-    if (!r.inicio || !r.fin) return `Completa las fechas de ${p.label}`
-    if (r.fin < r.inicio) return `En ${p.label}, la fecha fin debe ser posterior al inicio`
+    const r = form.value[p.key];
+    if (!r.inicio || !r.fin) return `Completa las fechas de ${p.label}`;
+    if (r.fin < r.inicio)
+      return `En ${p.label}, la fecha fin debe ser posterior al inicio`;
   }
-  return null
-}
+  return null;
+};
 
 const guardar = async () => {
-  const error = validar()
+  const error = validar();
   if (error) {
-    toast.value = error
-    setTimeout(() => { toast.value = '' }, 3000)
-    return
+    toast.value = error;
+    setTimeout(() => {
+      toast.value = "";
+    }, 3000);
+    return;
   }
 
-  guardando.value = true
+  guardando.value = true;
   try {
     const payload: ConfigParciales = {
       periodo: form.value.periodo.trim(),
@@ -64,32 +68,35 @@ const guardar = async () => {
       parcial_1: form.value.parcial_1.inicio ? form.value.parcial_1 : null,
       parcial_2: form.value.parcial_2.inicio ? form.value.parcial_2 : null,
       parcial_3: form.value.parcial_3.inicio ? form.value.parcial_3 : null,
-    }
-    await guardarConfigParciales(payload)
-    toast.value = 'Configuración guardada correctamente'
+    };
+    await guardarConfigParciales(payload);
+    toast.value = "Configuración guardada correctamente";
   } catch (e) {
-    console.error(e)
-    toast.value = 'Error al guardar. Verifica permisos en Firestore.'
+    console.error(e);
+    toast.value = "Error al guardar. Verifica permisos en Firestore.";
   } finally {
-    guardando.value = false
-    setTimeout(() => { toast.value = '' }, 3000)
+    guardando.value = false;
+    setTimeout(() => {
+      toast.value = "";
+    }, 3000);
   }
-}
+};
 
 const ventanaPreview = (rango: ParcialRango) => {
-  if (!rango.inicio || !rango.fin) return ''
-  const inicio = new Date(rango.inicio + 'T12:00:00')
-  inicio.setDate(inicio.getDate() - 7)
-  const desde = inicio.toISOString().split('T')[0]
-  return `Estudiantes podrán elegir del ${formatRango({ inicio: desde, fin: rango.fin })}`
-}
+  if (!rango.inicio || !rango.fin) return "";
+  const inicio = new Date(rango.inicio + "T12:00:00");
+  inicio.setDate(inicio.getDate() - 7);
+  const desde = inicio.toISOString().split("T")[0];
+  return `Estudiantes podrán elegir del ${formatRango({ inicio: desde, fin: rango.fin })}`;
+};
 </script>
 
 <template>
   <div class="parciales-page">
     <p class="page-desc">
-      Define el periodo académico y el rango de fechas de cada parcial. Los estudiantes solo podrán
-      seleccionar fechas desde <strong>1 semana antes</strong> del inicio hasta el fin del parcial.
+      Define el periodo académico y el rango de fechas de cada parcial. Los
+      estudiantes solo podrán seleccionar fechas desde
+      <strong>1 semana antes</strong> del inicio hasta el fin del parcial.
     </p>
 
     <div v-if="loading" class="loading">Cargando...</div>
@@ -128,7 +135,11 @@ const ventanaPreview = (rango: ParcialRango) => {
             </label>
             <label>
               <span>Fecha fin del parcial</span>
-              <input v-model="form[p.key].fin" type="date" :min="form[p.key].inicio" />
+              <input
+                v-model="form[p.key].fin"
+                type="date"
+                :min="form[p.key].inicio"
+              />
             </label>
           </div>
           <p v-if="form[p.key].inicio && form[p.key].fin" class="preview">
@@ -139,7 +150,7 @@ const ventanaPreview = (rango: ParcialRango) => {
     </template>
 
     <button class="btn-save" :disabled="guardando || loading" @click="guardar">
-      {{ guardando ? 'Guardando...' : 'Guardar configuración' }}
+      {{ guardando ? "Guardando..." : "Guardar configuración" }}
     </button>
 
     <div v-if="toast" class="toast">{{ toast }}</div>

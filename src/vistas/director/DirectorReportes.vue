@@ -1,186 +1,243 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
-import { fetchMaterias } from '@/lib/dominio/materias'
-import { fetchSolicitudesDirector } from '@/lib/director/directorSolicitudesAggregate'
-import { computarStatsDirector, TIPOS_TRAZABILIDAD } from '@/lib/director/directorStats'
-import TableDetailModal from '@/componentes/modales/TableDetailModal.vue'
-import { buildDetailFields } from '@/lib/nucleo/tableDetail'
+import { ref, computed, onMounted } from "vue";
+import { fetchMaterias } from "@/lib/dominio/materias";
+import { fetchSolicitudesDirector } from "@/lib/director/directorSolicitudesAggregate";
+import {
+  computarStatsDirector,
+  TIPOS_TRAZABILIDAD,
+} from "@/lib/director/directorStats";
+import TableDetailModal from "@/componentes/modales/TableDetailModal.vue";
+import { buildDetailFields } from "@/lib/nucleo/tableDetail";
 
-const loading = ref(true)
-const solicitudes = ref<any[]>([])
-const periodoSeleccionado = ref('todos')
+const loading = ref(true);
+const solicitudes = ref<any[]>([]);
+const periodoSeleccionado = ref("todos");
 
-const detalleVisible = ref(false)
-const detalleTitle = ref('')
-const detalleSubtitle = ref('')
-const detalleFields = ref<{ label: string; value: string; href?: string }[]>([])
+const detalleVisible = ref(false);
+const detalleTitle = ref("");
+const detalleSubtitle = ref("");
+const detalleFields = ref<{ label: string; value: string; href?: string }[]>(
+  [],
+);
 
 const verDetalleSolicitud = (s: any) => {
-  detalleTitle.value = s.nombre || 'Solicitud'
-  detalleSubtitle.value = tipoLabel[s.tipo] || s.tipo || ''
+  detalleTitle.value = s.nombre || "Solicitud";
+  detalleSubtitle.value = tipoLabel[s.tipo] || s.tipo || "";
   detalleFields.value = buildDetailFields(
-    { ...s, tipoLabel: tipoLabel[s.tipo] || s.tipo, fecha: formatFecha(s.creadoEn) },
+    {
+      ...s,
+      tipoLabel: tipoLabel[s.tipo] || s.tipo,
+      fecha: formatFecha(s.creadoEn),
+    },
     [
-      { key: 'nombre', label: 'Nombre' },
-      { key: 'cedula', label: 'Cédula' },
-      { key: 'tipoLabel', label: 'Tipo' },
-      { key: 'materia', label: 'Materia / curso' },
-      { key: 'motivo', label: 'Motivo / detalle' },
-      { key: 'estado', label: 'Estado' },
-      { key: 'fecha', label: 'Fecha' },
-      { key: 'pdf_url', label: 'Soporte PDF', hrefKey: 'pdf_url' },
+      { key: "nombre", label: "Nombre" },
+      { key: "cedula", label: "Cédula" },
+      { key: "tipoLabel", label: "Tipo" },
+      { key: "materia", label: "Materia / curso" },
+      { key: "motivo", label: "Motivo / detalle" },
+      { key: "estado", label: "Estado" },
+      { key: "fecha", label: "Fecha" },
+      { key: "pdf_url", label: "Soporte PDF", hrefKey: "pdf_url" },
     ],
-  )
-  detalleVisible.value = true
-}
+  );
+  detalleVisible.value = true;
+};
 
-const mesesNombres = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
+const mesesNombres = [
+  "Ene",
+  "Feb",
+  "Mar",
+  "Abr",
+  "May",
+  "Jun",
+  "Jul",
+  "Ago",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dic",
+];
 
 const tipoLabel: Record<string, string> = {
-  flexibilizacion: 'Flexibilización',
-  supletorio: 'Supletorio',
-  habilitacion: 'Habilitación',
-  inasistencia: 'Inasistencia docente',
-}
+  flexibilizacion: "Flexibilización",
+  supletorio: "Supletorio",
+  habilitacion: "Habilitación",
+  inasistencia: "Inasistencia docente",
+};
 
 const tipoColor: Record<string, string> = {
-  flexibilizacion: '#3b82f6',
-  supletorio: '#f59e0b',
-  habilitacion: '#10b981',
-  inasistencia: '#8b5cf6',
-}
+  flexibilizacion: "#3b82f6",
+  supletorio: "#f59e0b",
+  habilitacion: "#10b981",
+  inasistencia: "#8b5cf6",
+};
 
 // Tipos que la facultad solo registra/traza; la decisión la toma Secretaría General
 
 const formatFecha = (ts: any) => {
-  if (!ts) return '—'
-  const d = ts.toDate ? ts.toDate() : new Date(ts)
-  return d.toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' })
-}
+  if (!ts) return "—";
+  const d = ts.toDate ? ts.toDate() : new Date(ts);
+  return d.toLocaleDateString("es-CO", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+};
 
 const cargarDatos = async () => {
-  loading.value = true
+  loading.value = true;
   try {
-    let materias: Awaited<ReturnType<typeof fetchMaterias>> = []
+    let materias: Awaited<ReturnType<typeof fetchMaterias>> = [];
     try {
-      materias = await fetchMaterias()
+      materias = await fetchMaterias();
     } catch (e) {
-      console.error('Error cargando materias:', e)
+      console.error("Error cargando materias:", e);
     }
 
-    solicitudes.value = await fetchSolicitudesDirector(materias)
+    solicitudes.value = await fetchSolicitudesDirector(materias);
   } catch (e) {
-    console.error(e)
+    console.error(e);
   }
-  loading.value = false
-}
+  loading.value = false;
+};
 
 const solicitudesFiltradas = computed(() => {
-  if (periodoSeleccionado.value === 'todos') return solicitudes.value
-  const ahora = new Date()
-  const dias = periodoSeleccionado.value === '7d' ? 7 : periodoSeleccionado.value === '30d' ? 30 : 90
-  const desde = new Date(ahora.getTime() - dias * 24 * 60 * 60 * 1000)
-  return solicitudes.value.filter(s => {
-    const f = s.creadoEn?.toDate ? s.creadoEn.toDate() : new Date(s.creadoEn)
-    return f >= desde
-  })
-})
+  if (periodoSeleccionado.value === "todos") return solicitudes.value;
+  const ahora = new Date();
+  const dias =
+    periodoSeleccionado.value === "7d"
+      ? 7
+      : periodoSeleccionado.value === "30d"
+        ? 30
+        : 90;
+  const desde = new Date(ahora.getTime() - dias * 24 * 60 * 60 * 1000);
+  return solicitudes.value.filter((s) => {
+    const f = s.creadoEn?.toDate ? s.creadoEn.toDate() : new Date(s.creadoEn);
+    return f >= desde;
+  });
+});
 
 const gestionables = computed(() =>
-  solicitudesFiltradas.value.filter(s => !TIPOS_TRAZABILIDAD.includes(s.tipo))
-)
+  solicitudesFiltradas.value.filter(
+    (s) => !TIPOS_TRAZABILIDAD.includes(s.tipo),
+  ),
+);
 
 const stats = computed(() => {
-  const resumen = computarStatsDirector(solicitudesFiltradas.value)
+  const resumen = computarStatsDirector(solicitudesFiltradas.value);
   return {
     total: resumen.total,
     pendientes: resumen.pendientes,
     aprobadas: resumen.aprobadas,
     rechazadas: resumen.rechazadas,
-  }
-})
+  };
+});
 
 const tasaAprobacion = computed(() => {
-  const resueltas = stats.value.aprobadas + stats.value.rechazadas
-  if (!resueltas) return 0
-  return Math.round((stats.value.aprobadas / resueltas) * 100)
-})
+  const resueltas = stats.value.aprobadas + stats.value.rechazadas;
+  if (!resueltas) return 0;
+  return Math.round((stats.value.aprobadas / resueltas) * 100);
+});
 
-const trazabilidadStats = computed(() => computarStatsDirector(solicitudesFiltradas.value).trazabilidad)
+const trazabilidadStats = computed(
+  () => computarStatsDirector(solicitudesFiltradas.value).trazabilidad,
+);
 
 // Por tipo: incluye las 4 categorías (vista informativa de volumen total)
 const porTipo = computed(() => {
-  const map: Record<string, number> = {}
-  solicitudesFiltradas.value.forEach(s => {
-    const t = s.tipo || 'otro'
-    map[t] = (map[t] || 0) + 1
-  })
+  const map: Record<string, number> = {};
+  solicitudesFiltradas.value.forEach((s) => {
+    const t = s.tipo || "otro";
+    map[t] = (map[t] || 0) + 1;
+  });
   return Object.entries(map)
-    .map(([tipo, count]) => ({ tipo, count, label: tipoLabel[tipo] || tipo, color: tipoColor[tipo] || '#94a3b8' }))
-    .sort((a, b) => b.count - a.count)
-})
+    .map(([tipo, count]) => ({
+      tipo,
+      count,
+      label: tipoLabel[tipo] || tipo,
+      color: tipoColor[tipo] || "#94a3b8",
+    }))
+    .sort((a, b) => b.count - a.count);
+});
 
 // Por mes: incluye las 4 categorías (volumen total de trámites del programa)
 const porMes = computed(() => {
-  const ahora = new Date()
+  const ahora = new Date();
   const meses = Array.from({ length: 6 }, (_, i) => {
-    const d = new Date(ahora.getFullYear(), ahora.getMonth() - (5 - i), 1)
-    return { mes: d.getMonth(), anio: d.getFullYear(), label: mesesNombres[d.getMonth()], count: 0 }
-  })
-  solicitudesFiltradas.value.forEach(s => {
-    const f = s.creadoEn?.toDate ? s.creadoEn.toDate() : null
-    if (!f) return
-    const entry = meses.find(m => m.mes === f.getMonth() && m.anio === f.getFullYear())
-    if (entry) entry.count++
-  })
-  return meses
-})
+    const d = new Date(ahora.getFullYear(), ahora.getMonth() - (5 - i), 1);
+    return {
+      mes: d.getMonth(),
+      anio: d.getFullYear(),
+      label: mesesNombres[d.getMonth()],
+      count: 0,
+    };
+  });
+  solicitudesFiltradas.value.forEach((s) => {
+    const f = s.creadoEn?.toDate ? s.creadoEn.toDate() : null;
+    if (!f) return;
+    const entry = meses.find(
+      (m) => m.mes === f.getMonth() && m.anio === f.getFullYear(),
+    );
+    if (entry) entry.count++;
+  });
+  return meses;
+});
 
-const maxMes = computed(() => Math.max(...porMes.value.map(m => m.count), 1))
+const maxMes = computed(() => Math.max(...porMes.value.map((m) => m.count), 1));
 
-const maxTipo = computed(() => Math.max(...porTipo.value.map(t => t.count), 1))
+const maxTipo = computed(() =>
+  Math.max(...porTipo.value.map((t) => t.count), 1),
+);
 
 // Tabla de soporte PDF: solo tiene sentido para lo gestionable (hab/sup no manejan PDF)
-const conPDF = computed(() => solicitudesFiltradas.value.filter(s => s.pdf_url))
+const conPDF = computed(() =>
+  solicitudesFiltradas.value.filter((s) => s.pdf_url),
+);
 
 const estadoClass = (estado: string) => {
-  if (estado === 'Aprobada') return 'badge-aprobada'
-  if (estado === 'Rechazada') return 'badge-rechazada'
-  if (estado === 'Registrado') return 'badge-registrado'
-  return 'badge-pendiente'
-}
+  if (estado === "Aprobada") return "badge-aprobada";
+  if (estado === "Rechazada") return "badge-rechazada";
+  if (estado === "Registrado") return "badge-registrado";
+  return "badge-pendiente";
+};
 
 const exportarCSV = () => {
-  const headers = ['Nombre', 'Tipo', 'Materia', 'Estado', 'Fecha', 'PDF']
-  const rows = solicitudesFiltradas.value.map(s => [
-    s.nombre || '—',
-    tipoLabel[s.tipo] || s.tipo || '—',
-    s.materia || '—',
-    s.estado || '—',
+  const headers = ["Nombre", "Tipo", "Materia", "Estado", "Fecha", "PDF"];
+  const rows = solicitudesFiltradas.value.map((s) => [
+    s.nombre || "—",
+    tipoLabel[s.tipo] || s.tipo || "—",
+    s.materia || "—",
+    s.estado || "—",
     formatFecha(s.creadoEn),
-    s.pdf_url || '',
-  ])
-  const csv = [headers, ...rows].map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n')
-  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `reporte_solicitudes_${new Date().toISOString().split('T')[0]}.csv`
-  a.click()
-  URL.revokeObjectURL(url)
-}
+    s.pdf_url || "",
+  ]);
+  const csv = [headers, ...rows]
+    .map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(","))
+    .join("\n");
+  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `reporte_solicitudes_${new Date().toISOString().split("T")[0]}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+};
 
-onMounted(cargarDatos)
+onMounted(cargarDatos);
 </script>
 
 <template>
   <div class="reportes-page">
-
     <!-- Toolbar -->
     <div class="toolbar">
       <div class="periodo-tabs">
         <button
-          v-for="p in [['todos','Todo'], ['7d','7 días'], ['30d','30 días'], ['90d','90 días']]"
+          v-for="p in [
+            ['todos', 'Todo'],
+            ['7d', '7 días'],
+            ['30d', '30 días'],
+            ['90d', '90 días'],
+          ]"
           :key="p[0]"
           :class="['periodo-tab', { active: periodoSeleccionado === p[0] }]"
           @click="periodoSeleccionado = p[0]"
@@ -189,10 +246,17 @@ onMounted(cargarDatos)
         </button>
       </div>
       <button class="btn-export" @click="exportarCSV">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-          <polyline points="7 10 12 15 17 10"/>
-          <line x1="12" y1="15" x2="12" y2="3"/>
+        <svg
+          width="15"
+          height="15"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+          <polyline points="7 10 12 15 17 10" />
+          <line x1="12" y1="15" x2="12" y2="3" />
         </svg>
         Exportar CSV
       </button>
@@ -205,14 +269,22 @@ onMounted(cargarDatos)
     </div>
 
     <template v-else>
-
       <!-- Stats: solo lo que la facultad gestiona y decide -->
       <div class="stats-grid">
         <div class="stat-card">
           <div class="stat-icon blue">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-              <polyline points="14 2 14 8 20 8"/>
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path
+                d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
+              />
+              <polyline points="14 2 14 8 20 8" />
             </svg>
           </div>
           <div class="stat-content">
@@ -223,9 +295,16 @@ onMounted(cargarDatos)
 
         <div class="stat-card">
           <div class="stat-icon orange">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="12" cy="12" r="10"/>
-              <polyline points="12 6 12 12 16 14"/>
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <circle cx="12" cy="12" r="10" />
+              <polyline points="12 6 12 12 16 14" />
             </svg>
           </div>
           <div class="stat-content">
@@ -236,8 +315,15 @@ onMounted(cargarDatos)
 
         <div class="stat-card">
           <div class="stat-icon green">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polyline points="20 6 9 17 4 12"/>
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <polyline points="20 6 9 17 4 12" />
             </svg>
           </div>
           <div class="stat-content">
@@ -248,9 +334,16 @@ onMounted(cargarDatos)
 
         <div class="stat-card">
           <div class="stat-icon red">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <line x1="18" y1="6" x2="6" y2="18"/>
-              <line x1="6" y1="6" x2="18" y2="18"/>
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
             </svg>
           </div>
           <div class="stat-content">
@@ -261,8 +354,15 @@ onMounted(cargarDatos)
 
         <div class="stat-card">
           <div class="stat-icon purple">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
             </svg>
           </div>
           <div class="stat-content">
@@ -275,21 +375,33 @@ onMounted(cargarDatos)
       <!-- Trazabilidad: habilitaciones y supletorios (no requieren decisión de la facultad) -->
       <div class="trazabilidad-bar">
         <div class="trazabilidad-icon">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M9 11l3 3L22 4"/>
-            <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <path d="M9 11l3 3L22 4" />
+            <path
+              d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"
+            />
           </svg>
         </div>
         <span class="trazabilidad-texto">
-          <strong>{{ trazabilidadStats.total }}</strong> trámites de trazabilidad en este período
-          ({{ trazabilidadStats.habilitaciones }} habilitaciones, {{ trazabilidadStats.supletorios }} supletorios)
-          — la facultad solo entrega el formato, la decisión la toma Secretaría General.
+          <strong>{{ trazabilidadStats.total }}</strong> trámites de
+          trazabilidad en este período ({{
+            trazabilidadStats.habilitaciones
+          }}
+          habilitaciones, {{ trazabilidadStats.supletorios }} supletorios) — la
+          facultad solo entrega el formato, la decisión la toma Secretaría
+          General.
         </span>
       </div>
 
       <!-- Gráficas -->
       <div class="charts-grid">
-
         <!-- Solicitudes por mes -->
         <div class="card">
           <div class="card-header">
@@ -327,13 +439,15 @@ onMounted(cargarDatos)
               <div class="tipo-track">
                 <div
                   class="tipo-fill"
-                  :style="{ width: `${(t.count / maxTipo) * 100}%`, background: t.color }"
+                  :style="{
+                    width: `${(t.count / maxTipo) * 100}%`,
+                    background: t.color,
+                  }"
                 ></div>
               </div>
             </div>
           </div>
         </div>
-
       </div>
 
       <!-- Tabla solicitudes con PDF -->
@@ -343,7 +457,7 @@ onMounted(cargarDatos)
           <span class="card-badge">{{ conPDF.length }} archivos</span>
         </div>
 
-        <div v-if="conPDF.length === 0" class="empty-msg" style="padding: 24px;">
+        <div v-if="conPDF.length === 0" class="empty-msg" style="padding: 24px">
           No hay solicitudes con PDF adjunto
         </div>
 
@@ -367,10 +481,10 @@ onMounted(cargarDatos)
                 class="row-clickable"
                 @click="verDetalleSolicitud(s)"
               >
-                <td class="td-nombre">{{ s.nombre || '—' }}</td>
-                <td>{{ s.cedula || '—' }}</td>
-                <td>{{ tipoLabel[s.tipo] || s.tipo || '—' }}</td>
-                <td class="td-materia">{{ s.materia || '—' }}</td>
+                <td class="td-nombre">{{ s.nombre || "—" }}</td>
+                <td>{{ s.cedula || "—" }}</td>
+                <td>{{ tipoLabel[s.tipo] || s.tipo || "—" }}</td>
+                <td class="td-materia">{{ s.materia || "—" }}</td>
                 <td>
                   <span :class="['status-badge', estadoClass(s.estado)]">
                     {{ s.estado }}
@@ -378,10 +492,24 @@ onMounted(cargarDatos)
                 </td>
                 <td>{{ formatFecha(s.creadoEn) }}</td>
                 <td @click.stop>
-                  <a :href="s.pdf_url" target="_blank" class="pdf-link" @click.stop>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                      <polyline points="14 2 14 8 20 8"/>
+                  <a
+                    :href="s.pdf_url"
+                    target="_blank"
+                    class="pdf-link"
+                    @click.stop
+                  >
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                    >
+                      <path
+                        d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
+                      />
+                      <polyline points="14 2 14 8 20 8" />
                     </svg>
                     Ver PDF
                   </a>
@@ -391,7 +519,6 @@ onMounted(cargarDatos)
           </table>
         </div>
       </div>
-
     </template>
 
     <TableDetailModal
@@ -419,7 +546,10 @@ onMounted(cargarDatos)
   gap: 16px;
 }
 
-.periodo-tabs { display: flex; gap: 6px; }
+.periodo-tabs {
+  display: flex;
+  gap: 6px;
+}
 
 .periodo-tab {
   padding: 8px 14px;
@@ -433,8 +563,15 @@ onMounted(cargarDatos)
   transition: all var(--transition);
 }
 
-.periodo-tab:hover { border-color: var(--color-text-muted); color: var(--color-text); }
-.periodo-tab.active { background: var(--color-primary); color: white; border-color: var(--color-primary); }
+.periodo-tab:hover {
+  border-color: var(--color-text-muted);
+  color: var(--color-text);
+}
+.periodo-tab.active {
+  background: var(--color-primary);
+  color: white;
+  border-color: var(--color-primary);
+}
 
 .btn-export {
   display: inline-flex;
@@ -451,7 +588,9 @@ onMounted(cargarDatos)
   transition: all var(--transition);
 }
 
-.btn-export:hover { background: var(--color-background); }
+.btn-export:hover {
+  background: var(--color-background);
+}
 
 /* ── Loading ── */
 .loading-state {
@@ -473,7 +612,11 @@ onMounted(cargarDatos)
   animation: spin 0.7s linear infinite;
 }
 
-@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
 
 /* ── Stats ── */
 .stats-grid {
@@ -502,13 +645,32 @@ onMounted(cargarDatos)
   flex-shrink: 0;
 }
 
-.stat-icon.blue { background: #eff6ff; color: #3b82f6; }
-.stat-icon.orange { background: #fff7ed; color: #f59e0b; }
-.stat-icon.green { background: #f0fdf4; color: #10b981; }
-.stat-icon.red { background: #fef2f2; color: #ef4444; }
-.stat-icon.purple { background: #f5f3ff; color: #8b5cf6; }
+.stat-icon.blue {
+  background: #eff6ff;
+  color: #3b82f6;
+}
+.stat-icon.orange {
+  background: #fff7ed;
+  color: #f59e0b;
+}
+.stat-icon.green {
+  background: #f0fdf4;
+  color: #10b981;
+}
+.stat-icon.red {
+  background: #fef2f2;
+  color: #ef4444;
+}
+.stat-icon.purple {
+  background: #f5f3ff;
+  color: #8b5cf6;
+}
 
-.stat-content { display: flex; flex-direction: column; gap: 2px; }
+.stat-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
 
 .stat-value {
   font-size: 24px;
@@ -524,7 +686,9 @@ onMounted(cargarDatos)
 
 /* ── Trazabilidad bar ── */
 .trazabilidad-bar {
-  display: flex; align-items: center; gap: 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
   background: var(--color-surface);
   border: 1px solid var(--color-border-light);
   border-radius: var(--radius);
@@ -533,13 +697,19 @@ onMounted(cargarDatos)
   color: var(--color-text-secondary);
 }
 .trazabilidad-icon {
-  width: 28px; height: 28px; border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
   background: var(--color-background);
   color: var(--color-text-muted);
-  display: flex; align-items: center; justify-content: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
 }
-.trazabilidad-texto strong { color: var(--color-text); }
+.trazabilidad-texto strong {
+  color: var(--color-text);
+}
 
 /* ── Charts ── */
 .charts-grid {
@@ -617,7 +787,9 @@ onMounted(cargarDatos)
   min-height: 4px;
 }
 
-.blue-fill { background: var(--color-primary); }
+.blue-fill {
+  background: var(--color-primary);
+}
 
 .bar-count {
   font-size: 12px;
@@ -638,7 +810,11 @@ onMounted(cargarDatos)
   padding: 20px;
 }
 
-.tipo-item { display: flex; flex-direction: column; gap: 6px; }
+.tipo-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
 
 .tipo-header {
   display: flex;
@@ -679,7 +855,9 @@ onMounted(cargarDatos)
 }
 
 /* ── Table ── */
-.table-wrapper { overflow-x: auto; }
+.table-wrapper {
+  overflow-x: auto;
+}
 
 .data-table {
   width: 100%;
@@ -708,12 +886,22 @@ onMounted(cargarDatos)
   vertical-align: middle;
 }
 
-.data-table tbody tr:hover { background: var(--color-background); }
-.data-table tbody tr.row-clickable { cursor: pointer; }
-.data-table tbody tr.row-clickable:hover { background: var(--color-subtle); }
-.data-table tbody tr:last-child td { border-bottom: none; }
+.data-table tbody tr:hover {
+  background: var(--color-background);
+}
+.data-table tbody tr.row-clickable {
+  cursor: pointer;
+}
+.data-table tbody tr.row-clickable:hover {
+  background: var(--color-subtle);
+}
+.data-table tbody tr:last-child td {
+  border-bottom: none;
+}
 
-.td-nombre { font-weight: 500; }
+.td-nombre {
+  font-weight: 500;
+}
 .td-materia {
   max-width: 180px;
   white-space: nowrap;
@@ -730,10 +918,22 @@ onMounted(cargarDatos)
   white-space: nowrap;
 }
 
-.badge-aprobada { background: #f0fdf4; color: #16a34a; }
-.badge-rechazada { background: #fef2f2; color: #dc2626; }
-.badge-pendiente { background: #fef3c7; color: #d97706; }
-.badge-registrado { background: #eff6ff; color: #2563eb; }
+.badge-aprobada {
+  background: #f0fdf4;
+  color: #16a34a;
+}
+.badge-rechazada {
+  background: #fef2f2;
+  color: #dc2626;
+}
+.badge-pendiente {
+  background: #fef3c7;
+  color: #d97706;
+}
+.badge-registrado {
+  background: #eff6ff;
+  color: #2563eb;
+}
 
 /* ── PDF link ── */
 .pdf-link {
@@ -765,12 +965,21 @@ onMounted(cargarDatos)
 
 /* ── Responsive ── */
 @media (max-width: 1024px) {
-  .stats-grid { grid-template-columns: repeat(3, 1fr); }
-  .charts-grid { grid-template-columns: 1fr; }
+  .stats-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .charts-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 640px) {
-  .stats-grid { grid-template-columns: repeat(2, 1fr); }
-  .toolbar { flex-direction: column; align-items: flex-start; }
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .toolbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 }
 </style>

@@ -1,136 +1,135 @@
 <script setup lang="ts">
-import { onMounted, ref, computed, watch } from 'vue'
-import { db } from '@/lib/firebase'
-import { sanitizarUsuario } from '@/lib/autenticacion/usuarioSeguro'
-import { labelRol } from '@/lib/nucleo/roles'
-import TableDetailModal from '@/componentes/modales/TableDetailModal.vue'
-import { buildDetailFields } from '@/lib/nucleo/tableDetail'
-import { collection, getDocs } from 'firebase/firestore'
+import { onMounted, ref, computed, watch } from "vue";
+import { db } from "@/lib/firebase";
+import { sanitizarUsuario } from "@/lib/autenticacion/usuarioSeguro";
+import { labelRol } from "@/lib/nucleo/roles";
+import TableDetailModal from "@/componentes/modales/TableDetailModal.vue";
+import { buildDetailFields } from "@/lib/nucleo/tableDetail";
+import { collection, getDocs } from "firebase/firestore";
 
-const PAGE_SIZE = 20
+const PAGE_SIZE = 20;
 
-const activeFilter = ref('todos')
-const busqueda = ref('')
-const paginaActual = ref(1)
-const usuarios = ref<any[]>([])
-const loading = ref(true)
-const errorCarga = ref('')
+const activeFilter = ref("todos");
+const busqueda = ref("");
+const paginaActual = ref(1);
+const usuarios = ref<any[]>([]);
+const loading = ref(true);
+const errorCarga = ref("");
 
-const slugRol = (rol: string) => rol?.toLowerCase().replace(/\s+/g, '-') || ''
+const slugRol = (rol: string) => rol?.toLowerCase().replace(/\s+/g, "-") || "";
 
-const detalleVisible = ref(false)
-const detalleTitle = ref('')
-const detalleSubtitle = ref('')
-const detalleFields = ref<{ label: string; value: string; href?: string }[]>([])
+const detalleVisible = ref(false);
+const detalleTitle = ref("");
+const detalleSubtitle = ref("");
+const detalleFields = ref<{ label: string; value: string; href?: string }[]>(
+  [],
+);
 
 const verDetalleUsuario = (usuario: any) => {
-  detalleTitle.value = usuario.nombre || 'Usuario'
-  detalleSubtitle.value = labelRol(usuario.rol)
+  detalleTitle.value = usuario.nombre || "Usuario";
+  detalleSubtitle.value = labelRol(usuario.rol);
   detalleFields.value = buildDetailFields(usuario, [
-    { key: 'nombre', label: 'Nombre completo' },
-    { key: 'cedula', label: 'Cédula' },
-    { key: 'correo', label: 'Correo' },
-    { key: 'rol', label: 'Rol' },
-    { key: 'celular', label: 'Celular' },
-    { key: 'registrado', label: 'Cuenta activada' },
-  ])
-  detalleVisible.value = true
-}
+    { key: "nombre", label: "Nombre completo" },
+    { key: "cedula", label: "Cédula" },
+    { key: "correo", label: "Correo" },
+    { key: "rol", label: "Rol" },
+    { key: "celular", label: "Celular" },
+    { key: "registrado", label: "Cuenta activada" },
+  ]);
+  detalleVisible.value = true;
+};
 
 const cargarUsuarios = async () => {
-  errorCarga.value = ''
-  loading.value = true
+  errorCarga.value = "";
+  loading.value = true;
   try {
-    const querySnapshot = await getDocs(collection(db, 'usuarios'))
-    usuarios.value = querySnapshot.docs.map(docSnap =>
+    const querySnapshot = await getDocs(collection(db, "usuarios"));
+    usuarios.value = querySnapshot.docs.map((docSnap) =>
       sanitizarUsuario(docSnap.data() as Record<string, unknown>, docSnap.id),
-    )
+    );
   } catch (e) {
-    console.error(e)
-    usuarios.value = []
+    console.error(e);
+    usuarios.value = [];
     errorCarga.value =
-      'No se pudieron cargar los usuarios. Verifica tu conexión e intenta nuevamente.'
+      "No se pudieron cargar los usuarios. Verifica tu conexión e intenta nuevamente.";
   } finally {
-    loading.value = false
+    loading.value = false;
   }
-}
+};
 
-onMounted(cargarUsuarios)
+onMounted(cargarUsuarios);
 
 const filtros = [
-  { id: 'todos', label: 'Todos' },
-  { id: 'docente', label: 'Docentes' },
-  { id: 'estudiante', label: 'Estudiantes' },
-  { id: 'director', label: 'Practicantes' },
-]
+  { id: "todos", label: "Todos" },
+  { id: "docente", label: "Docentes" },
+  { id: "estudiante", label: "Estudiantes" },
+  { id: "director", label: "Practicantes" },
+];
 
 const inicialesDe = (nombre: string) => {
-  const n = nombre?.trim()
-  if (!n) return '?'
-  const partes = n.split(/\s+/).filter(Boolean)
-  if (partes.length >= 2) return (partes[0][0] + partes[1][0]).toUpperCase()
-  return partes[0][0].toUpperCase()
-}
+  const n = nombre?.trim();
+  if (!n) return "?";
+  const partes = n.split(/\s+/).filter(Boolean);
+  if (partes.length >= 2) return (partes[0][0] + partes[1][0]).toUpperCase();
+  return partes[0][0].toUpperCase();
+};
 
 const limpiarBusqueda = () => {
-  busqueda.value = ''
-}
-
+  busqueda.value = "";
+};
 
 const usuariosFiltrados = computed(() => {
-  let lista = usuarios.value
+  let lista = usuarios.value;
 
-  if (activeFilter.value !== 'todos') {
-    if (activeFilter.value === 'director') {
-      lista = lista.filter(u => u.rol === 'Director' || u.rol === 'Jefa Suprema')
+  if (activeFilter.value !== "todos") {
+    if (activeFilter.value === "director") {
+      lista = lista.filter(
+        (u) => u.rol === "Director" || u.rol === "Jefa Suprema",
+      );
     } else {
-      lista = lista.filter(u =>
-        u.rol?.toLowerCase() === activeFilter.value.toLowerCase()
-      )
+      lista = lista.filter(
+        (u) => u.rol?.toLowerCase() === activeFilter.value.toLowerCase(),
+      );
     }
   }
 
   if (busqueda.value.trim()) {
-    const texto = busqueda.value.toLowerCase()
-    lista = lista.filter(u =>
-      u.nombre?.toLowerCase().includes(texto) ||
-      u.correo?.toLowerCase().includes(texto) ||
-      u.cedula?.toString().includes(texto)
-    )
+    const texto = busqueda.value.toLowerCase();
+    lista = lista.filter(
+      (u) =>
+        u.nombre?.toLowerCase().includes(texto) ||
+        u.correo?.toLowerCase().includes(texto) ||
+        u.cedula?.toString().includes(texto),
+    );
   }
 
-  return lista
-})
+  return lista;
+});
 
 const totalPaginas = computed(() =>
-  Math.max(1, Math.ceil(usuariosFiltrados.value.length / PAGE_SIZE))
-)
+  Math.max(1, Math.ceil(usuariosFiltrados.value.length / PAGE_SIZE)),
+);
 
 const usuariosPaginados = computed(() => {
-  const inicio = (paginaActual.value - 1) * PAGE_SIZE
-  return usuariosFiltrados.value.slice(inicio, inicio + PAGE_SIZE)
-})
+  const inicio = (paginaActual.value - 1) * PAGE_SIZE;
+  return usuariosFiltrados.value.slice(inicio, inicio + PAGE_SIZE);
+});
 
 watch([activeFilter, busqueda], () => {
-  paginaActual.value = 1
-})
+  paginaActual.value = 1;
+});
 
 const irPagina = (pagina: number) => {
-  if (pagina < 1 || pagina > totalPaginas.value) return
-  paginaActual.value = pagina
-}
-
+  if (pagina < 1 || pagina > totalPaginas.value) return;
+  paginaActual.value = pagina;
+};
 </script>
 
 <template>
   <div class="representante-list-page">
-
     <section class="command-bar">
-
       <div class="command-row">
-
         <div class="search-box">
-
           <svg
             class="search-icon"
             width="18"
@@ -140,10 +139,9 @@ const irPagina = (pagina: number) => {
             stroke="currentColor"
             stroke-width="2"
           >
-            <circle cx="11" cy="11" r="8"/>
-            <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            <circle cx="11" cy="11" r="8" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
           </svg>
-
 
           <input
             v-model="busqueda"
@@ -152,7 +150,6 @@ const irPagina = (pagina: number) => {
             placeholder="Buscar por nombre, correo o cédula..."
           />
 
-
           <button
             v-if="busqueda"
             type="button"
@@ -160,7 +157,6 @@ const irPagina = (pagina: number) => {
             aria-label="Limpiar búsqueda"
             @click="limpiarBusqueda"
           >
-
             <svg
               width="14"
               height="14"
@@ -169,113 +165,61 @@ const irPagina = (pagina: number) => {
               stroke="currentColor"
               stroke-width="2.5"
             >
-              <line x1="18" y1="6" x2="6" y2="18"/>
-              <line x1="6" y1="6" x2="18" y2="18"/>
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
             </svg>
-
           </button>
-
         </div>
-
       </div>
 
-
       <div class="filter-row">
-
         <button
           v-for="filtro in filtros"
           :key="filtro.id"
           type="button"
-          :class="[
-            'filter-chip',
-            { active: activeFilter === filtro.id }
-          ]"
+          :class="['filter-chip', { active: activeFilter === filtro.id }]"
           @click="activeFilter = filtro.id"
         >
           {{ filtro.label }}
-
         </button>
-
       </div>
-
-
     </section>
-
-
 
     <!-- TABLA -->
 
     <section class="table-section">
-
-
-      <div
-        v-if="loading"
-        class="loading-state"
-      >
-
+      <div v-if="loading" class="loading-state">
         <div class="spinner"></div>
 
-        <span>
-          Cargando usuarios...
-        </span>
-
+        <span> Cargando usuarios... </span>
       </div>
 
-
-
-      <div
-        v-else
-        class="table-card"
-      >
-
-
+      <div v-else class="table-card">
         <div class="table-card-header">
-
           <div>
-
-            <h2 class="table-title">
-              Lista de usuarios
-            </h2>
-
+            <h2 class="table-title">Lista de usuarios</h2>
 
             <p class="table-subtitle">
-
               {{ usuarios.length }} en el sistema ·
 
               {{ usuariosFiltrados.length }}
-              resultado{{ usuariosFiltrados.length === 1 ? '' : 's' }}
+              resultado{{ usuariosFiltrados.length === 1 ? "" : "s" }}
 
               <template v-if="busqueda.trim()">
                 para «{{ busqueda }}»
               </template>
-
             </p>
-
-
           </div>
-
-
         </div>
-
-
-
 
         <!-- ERROR -->
 
-        <div
-          v-if="errorCarga"
-          class="empty-panel"
-        >
-
-          <p class="empty-title">
-            Error al cargar usuarios
-          </p>
-
+        <div v-if="errorCarga" class="empty-panel">
+          <p class="empty-title">Error al cargar usuarios</p>
 
           <p class="empty-desc">
             {{ errorCarga }}
           </p>
-
 
           <button
             type="button"
@@ -284,222 +228,95 @@ const irPagina = (pagina: number) => {
           >
             Reintentar
           </button>
-
-
         </div>
-
-
-
 
         <!-- TABLA -->
 
-        <div
-          v-else-if="usuariosFiltrados.length > 0"
-          class="table-wrap"
-        >
-
-
+        <div v-else-if="usuariosFiltrados.length > 0" class="table-wrap">
           <table class="data-table">
-
-
             <thead>
-
               <tr>
+                <th>Usuario</th>
 
-                <th>
-                  Usuario
-                </th>
+                <th>Cédula</th>
 
-                <th>
-                  Cédula
-                </th>
+                <th>Correo</th>
 
-                <th>
-                  Correo
-                </th>
-
-                <th>
-                  Rol
-                </th>
-
+                <th>Rol</th>
               </tr>
-
-
             </thead>
 
-
-
             <tbody>
-
-
               <tr
                 v-for="usuario in usuariosPaginados"
                 :key="usuario.id"
                 class="row-clickable"
                 @click="verDetalleUsuario(usuario)"
               >
-
-
                 <td>
-
-
                   <div class="user-cell">
-
-
-                    <div
-                      :class="[
-                        'user-avatar',
-                        slugRol(usuario.rol)
-                      ]"
-                    >
-
+                    <div :class="['user-avatar', slugRol(usuario.rol)]">
                       {{ inicialesDe(usuario.nombre) }}
-
                     </div>
 
-
-
                     <span class="user-name">
-
                       {{ usuario.nombre }}
-
                     </span>
-
-
                   </div>
-
-
                 </td>
 
-
-
-
                 <td>
-
                   <span class="cedula-cell">
-
                     {{ usuario.cedula }}
-
                   </span>
-
                 </td>
 
-
-
-
                 <td>
-
                   <span class="email-cell">
-
                     {{ usuario.correo }}
-
                   </span>
-
                 </td>
-
-
-
 
                 <td>
-
-                  <span
-                    :class="[
-                      'status-badge',
-                      slugRol(usuario.rol)
-                    ]"
-                  >
-
+                  <span :class="['status-badge', slugRol(usuario.rol)]">
                     {{ labelRol(usuario.rol) }}
-
                   </span>
-
-
                 </td>
-
-
-
               </tr>
-
-
-
             </tbody>
-
-
-
           </table>
-
-
-
         </div>
-
-
-
-
 
         <!-- SIN RESULTADOS -->
 
-        <div
-          v-else
-          class="empty-panel"
-        >
+        <div v-else class="empty-panel">
+          <p class="empty-title">No se encontraron usuarios</p>
 
-          <p class="empty-title">
-            No se encontraron usuarios
-          </p>
-
-
-          <p class="empty-desc">
-            Prueba cambiando el filtro o la búsqueda.
-          </p>
-
-
+          <p class="empty-desc">Prueba cambiando el filtro o la búsqueda.</p>
         </div>
-
-
-
-
-
 
         <!-- PAGINACION -->
 
-
-        <div
-          v-if="usuariosFiltrados.length > 0"
-          class="table-footer"
-        >
-
-
+        <div v-if="usuariosFiltrados.length > 0" class="table-footer">
           <span>
-
             {{ usuariosFiltrados.length }}
 
-            usuario{{ usuariosFiltrados.length === 1 ? '' : 's' }}
+            usuario{{ usuariosFiltrados.length === 1 ? "" : "s" }}
 
             · Página {{ paginaActual }}
 
             de {{ totalPaginas }}
-
-
           </span>
 
-
-
-
           <div class="pagination-controls">
-
-
             <button
               type="button"
               class="page-nav"
               :disabled="paginaActual <= 1"
               @click="irPagina(paginaActual - 1)"
             >
-
               Anterior
-
             </button>
-
-
 
             <button
               type="button"
@@ -507,51 +324,23 @@ const irPagina = (pagina: number) => {
               :disabled="paginaActual >= totalPaginas"
               @click="irPagina(paginaActual + 1)"
             >
-
               Siguiente
-
             </button>
-
-
-
           </div>
-
-
         </div>
-
-
-
-
       </div>
-
-
-
     </section>
-
-
-
-
 
     <!-- DETALLE -->
 
     <TableDetailModal
-
       :open="detalleVisible"
-
       :title="detalleTitle"
-
       :subtitle="detalleSubtitle"
-
       :fields="detalleFields"
-
       @close="detalleVisible = false"
-
     />
-
-
-
   </div>
-
 </template>
 
 <style scoped>
@@ -607,7 +396,10 @@ const irPagina = (pagina: number) => {
   color: var(--color-text);
   font-size: 14px;
   outline: none;
-  transition: border-color var(--transition), box-shadow var(--transition), background var(--transition);
+  transition:
+    border-color var(--transition),
+    box-shadow var(--transition),
+    background var(--transition);
 }
 
 .search-input:focus {
@@ -616,7 +408,9 @@ const irPagina = (pagina: number) => {
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
 }
 
-.search-input::placeholder { color: var(--color-text-muted); }
+.search-input::placeholder {
+  color: var(--color-text-muted);
+}
 
 .search-clear {
   position: absolute;
@@ -743,10 +537,14 @@ const irPagina = (pagina: number) => {
   border: 1px solid var(--color-border);
 }
 
-.btn-ghost:hover { background: var(--color-border-light); }
+.btn-ghost:hover {
+  background: var(--color-border-light);
+}
 
 /* Table section */
-.table-section { min-height: 200px; }
+.table-section {
+  min-height: 200px;
+}
 
 .table-card {
   background: var(--color-surface);
@@ -796,11 +594,21 @@ const irPagina = (pagina: number) => {
   border-bottom: 1px solid var(--color-border-light);
 }
 
-.data-table th:nth-child(1) { width: 30%; }
-.data-table th:nth-child(2) { width: 16%; }
-.data-table th:nth-child(3) { width: 32%; }
-.data-table th:nth-child(4) { width: 16%; }
-.data-table th:nth-child(5) { width: 12%; }
+.data-table th:nth-child(1) {
+  width: 30%;
+}
+.data-table th:nth-child(2) {
+  width: 16%;
+}
+.data-table th:nth-child(3) {
+  width: 32%;
+}
+.data-table th:nth-child(4) {
+  width: 16%;
+}
+.data-table th:nth-child(5) {
+  width: 12%;
+}
 
 .data-table td {
   padding: 14px 16px;
@@ -849,10 +657,18 @@ const irPagina = (pagina: number) => {
   background: var(--color-primary);
 }
 
-.user-avatar.docente { background: #3b82f6; }
-.user-avatar.estudiante { background: #10b981; }
-.user-avatar.director { background: #f59e0b; }
-.user-avatar.jefa-suprema { background: #be185d; }
+.user-avatar.docente {
+  background: #3b82f6;
+}
+.user-avatar.estudiante {
+  background: #10b981;
+}
+.user-avatar.director {
+  background: #f59e0b;
+}
+.user-avatar.jefa-suprema {
+  background: #be185d;
+}
 
 .user-name {
   font-weight: 500;
@@ -882,10 +698,22 @@ const irPagina = (pagina: number) => {
   white-space: nowrap;
 }
 
-.status-badge.docente { background: var(--color-info-bg); color: var(--color-info); }
-.status-badge.estudiante { background: var(--color-success-bg); color: var(--color-success); }
-.status-badge.director { background: var(--color-warning-bg); color: var(--color-warning); }
-.status-badge.jefa-suprema { background: #fdf2f8; color: #9d174d; }
+.status-badge.docente {
+  background: var(--color-info-bg);
+  color: var(--color-info);
+}
+.status-badge.estudiante {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+.status-badge.director {
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+}
+.status-badge.jefa-suprema {
+  background: #fdf2f8;
+  color: #9d174d;
+}
 
 .table-footer {
   padding: 12px 20px;
@@ -925,7 +753,6 @@ const irPagina = (pagina: number) => {
   opacity: 0.45;
   cursor: not-allowed;
 }
-
 
 .action-btn {
   width: 34px;
@@ -1002,7 +829,11 @@ const irPagina = (pagina: number) => {
   animation: spin 0.7s linear infinite;
 }
 
-@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
 
 @media (max-width: 900px) {
   .command-row {
@@ -1084,10 +915,18 @@ const irPagina = (pagina: number) => {
   background: var(--color-primary);
 }
 
-.modal-avatar.docente { background: #3b82f6; }
-.modal-avatar.estudiante { background: #10b981; }
-.modal-avatar.director { background: #f59e0b; }
-.modal-avatar.jefa-suprema { background: #be185d; }
+.modal-avatar.docente {
+  background: #3b82f6;
+}
+.modal-avatar.estudiante {
+  background: #10b981;
+}
+.modal-avatar.director {
+  background: #f59e0b;
+}
+.modal-avatar.jefa-suprema {
+  background: #be185d;
+}
 
 .modal-title {
   font-size: 17px;
@@ -1116,10 +955,22 @@ const irPagina = (pagina: number) => {
   font-weight: 600;
 }
 
-.modal-rol-badge.docente { background: var(--color-info-bg); color: var(--color-info); }
-.modal-rol-badge.estudiante { background: var(--color-success-bg); color: var(--color-success); }
-.modal-rol-badge.director { background: var(--color-warning-bg); color: var(--color-warning); }
-.modal-rol-badge.jefa-suprema { background: #fdf2f8; color: #9d174d; }
+.modal-rol-badge.docente {
+  background: var(--color-info-bg);
+  color: var(--color-info);
+}
+.modal-rol-badge.estudiante {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+.modal-rol-badge.director {
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+}
+.modal-rol-badge.jefa-suprema {
+  background: #fdf2f8;
+  color: #9d174d;
+}
 
 .modal-close {
   width: 32px;
@@ -1140,9 +991,21 @@ const irPagina = (pagina: number) => {
   background: var(--color-subtle);
   color: var(--color-text);
 }
-.modal-divider { height: 1px; background: var(--color-border-light); }
-.modal-body { padding: 20px 24px 8px; display: flex; flex-direction: column; gap: 20px; }
-.modal-section { display: flex; flex-direction: column; gap: 12px; }
+.modal-divider {
+  height: 1px;
+  background: var(--color-border-light);
+}
+.modal-body {
+  padding: 20px 24px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.modal-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
 .modal-section-title {
   font-size: 11px;
   font-weight: 700;
@@ -1156,10 +1019,19 @@ const irPagina = (pagina: number) => {
   grid-template-columns: 1fr 1.6fr;
   gap: 12px 14px;
 }
-.field-group-wide { grid-column: span 1; }
-.field-group-full { grid-column: 1 / -1; }
-.field-mono { font-variant-numeric: tabular-nums; letter-spacing: 0.02em; }
-.field-with-icon { position: relative; }
+.field-group-wide {
+  grid-column: span 1;
+}
+.field-group-full {
+  grid-column: 1 / -1;
+}
+.field-mono {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+.field-with-icon {
+  position: relative;
+}
 .field-icon {
   position: absolute;
   left: 12px;
@@ -1168,7 +1040,9 @@ const irPagina = (pagina: number) => {
   color: var(--color-text-muted);
   pointer-events: none;
 }
-.field-input-icon { padding-left: 38px; }
+.field-input-icon {
+  padding-left: 38px;
+}
 .rol-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -1183,7 +1057,8 @@ const irPagina = (pagina: number) => {
 .rol-card.active {
   border-color: var(--color-primary);
   background: var(--color-surface);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 12%, transparent);
+  box-shadow: 0 0 0 2px
+    color-mix(in srgb, var(--color-primary) 12%, transparent);
 }
 .rol-card.active.docente,
 .rol-card.active.estudiante,
@@ -1251,19 +1126,30 @@ const irPagina = (pagina: number) => {
 }
 .jefa-panel-enter-active,
 .jefa-panel-leave-active {
-  transition: opacity 0.2s ease, transform 0.2s ease;
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease;
 }
 .jefa-panel-enter-from,
 .jefa-panel-leave-to {
   opacity: 0;
   transform: translateY(-6px);
 }
-.field-group { display: flex; flex-direction: column; gap: 6px; }
-.field-label { font-size: 12px; font-weight: 600; color: var(--color-text); }
+.field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.field-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text);
+}
 
 .field-input:focus {
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 12%, transparent);
+  box-shadow: 0 0 0 3px
+    color-mix(in srgb, var(--color-primary) 12%, transparent);
 }
 .modal-footer-edit {
   padding: 16px 20px 20px;
@@ -1295,66 +1181,132 @@ const irPagina = (pagina: number) => {
   border-color: #fcd34d;
 }
 @media (max-width: 560px) {
-  .modal-fields-grid { grid-template-columns: 1fr; }
+  .modal-fields-grid {
+    grid-template-columns: 1fr;
+  }
   .field-group-wide,
-  .field-group-full { grid-column: auto; }
-  .rol-grid { grid-template-columns: 1fr; }
-  .modal-footer-edit { flex-direction: column; align-items: stretch; }
-  .actions-right { width: 100%; }
-  .actions-right .btn { flex: 1; justify-content: center; }
-  .btn-reset-link { justify-content: center; }
+  .field-group-full {
+    grid-column: auto;
+  }
+  .rol-grid {
+    grid-template-columns: 1fr;
+  }
+  .modal-footer-edit {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .actions-right {
+    width: 100%;
+  }
+  .actions-right .btn {
+    flex: 1;
+    justify-content: center;
+  }
+  .btn-reset-link {
+    justify-content: center;
+  }
 }
 
-.toast-success, .toast-import {
-  position: fixed; bottom: 28px; right: 28px; z-index: 2000;
-  display: flex; align-items: center; gap: 12px;
-  background: #111827; color: white;
-  padding: 14px 20px; border-radius: 12px;
-  font-size: 13px; font-weight: 500;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+.toast-success,
+.toast-import {
+  position: fixed;
+  bottom: 28px;
+  right: 28px;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #111827;
+  color: white;
+  padding: 14px 20px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 500;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
 }
-.toast-import { bottom: 88px; }
+.toast-import {
+  bottom: 88px;
+}
 
 .toast-icon {
-  width: 28px; height: 28px; border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
   background: #10b981;
-  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
 .loading-state {
-  display: flex; align-items: center; justify-content: center;
-  gap: 12px; padding: 60px 20px;
-  color: var(--color-text-muted); font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 60px 20px;
+  color: var(--color-text-muted);
+  font-size: 13px;
 }
 .spinner {
-  width: 20px; height: 20px;
+  width: 20px;
+  height: 20px;
   border: 2px solid var(--color-border);
   border-top-color: var(--color-primary);
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
 }
-@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
 
-.modal-enter-active, .modal-leave-active { transition: opacity 0.2s ease; }
+.modal-enter-active,
+.modal-leave-active {
+  transition: opacity 0.2s ease;
+}
 .modal-enter-active .modal-card,
-.modal-leave-active .modal-card { transition: transform 0.2s ease, opacity 0.2s ease; }
-.modal-enter-from, .modal-leave-to { opacity: 0; }
-.modal-enter-from .modal-card, .modal-leave-to .modal-card { transform: scale(0.95) translateY(8px); opacity: 0; }
+.modal-leave-active .modal-card {
+  transition:
+    transform 0.2s ease,
+    opacity 0.2s ease;
+}
+.modal-enter-from,
+.modal-leave-to {
+  opacity: 0;
+}
+.modal-enter-from .modal-card,
+.modal-leave-to .modal-card {
+  transform: scale(0.95) translateY(8px);
+  opacity: 0;
+}
 
-.toast-enter-active, .toast-leave-active { transition: all 0.3s ease; }
-.toast-enter-from, .toast-leave-to { opacity: 0; transform: translateY(12px) scale(0.95); }
+.toast-enter-active,
+.toast-leave-active {
+  transition: all 0.3s ease;
+}
+.toast-enter-from,
+.toast-leave-to {
+  opacity: 0;
+  transform: translateY(12px) scale(0.95);
+}
 
 .action-btn.reset:hover {
   background: var(--color-warning-bg);
   color: var(--color-warning);
 }
 
-.modal-footer { padding: 16px 24px 24px; display: flex; justify-content: flex-end; gap: 10px; }
+.modal-footer {
+  padding: 16px 24px 24px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
 
 .actions-right {
   display: flex;
   gap: 10px;
   margin-left: auto;
 }
-
 </style>
